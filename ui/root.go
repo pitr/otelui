@@ -29,7 +29,7 @@ type keyMapRoot struct {
 }
 
 func (k keyMapRoot) Help() []key.Binding {
-	return []key.Binding{k.Quit, k.Next, k.Prev}
+	return []key.Binding{k.Quit, k.Next}
 }
 
 type model struct {
@@ -47,8 +47,8 @@ type model struct {
 func newRootModel() tea.Model {
 	return &model{
 		keyMap: keyMapRoot{
-			Next: key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next mode")),
-			Prev: key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "prev mode")),
+			Next: key.NewBinding(key.WithKeys("]"), key.WithHelp("[/]", "switch mode")),
+			Prev: key.NewBinding(key.WithKeys("[")),
 			Quit: key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit")),
 		},
 		help:      help.New(),
@@ -103,10 +103,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case key.Matches(msg, m.keyMap.Next):
 			m.mode = (m.mode + 1) % mRoot(len(m.models))
-			return m, nil
 		case key.Matches(msg, m.keyMap.Prev):
-			m.mode = (m.mode - 1 + mRoot(len(m.models))) % mRoot(len(m.models))
-			return m, nil
+			m.mode = (m.mode - 1) % mRoot(len(m.models))
 		default:
 			m.models[m.mode], cmd = m.models[m.mode].Update(msg)
 		}

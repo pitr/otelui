@@ -28,12 +28,12 @@ type keyMapLogs struct {
 	Decrease key.Binding
 	Up       key.Binding
 	Down     key.Binding
-	Enter    key.Binding
-	Esc      key.Binding
+	Next     key.Binding
+	Prev     key.Binding
 }
 
 func (k keyMapLogs) Help() []key.Binding {
-	return []key.Binding{k.Increase, k.Up, k.Enter, k.Esc}
+	return []key.Binding{k.Increase, k.Up, k.Next}
 }
 
 type QueriedLogs []*server.Log
@@ -56,12 +56,12 @@ func newLogsModel() tea.Model {
 	faded := lipgloss.AdaptiveColor{Light: "#B2B2B2", Dark: "#4A4A4A"}
 	return &logsModel{
 		keyMap: keyMapLogs{
-			Increase: key.NewBinding(key.WithKeys("+"), key.WithHelp("+/-", "resize details")),
+			Increase: key.NewBinding(key.WithKeys("+"), key.WithHelp("+/-", "resize")),
 			Decrease: key.NewBinding(key.WithKeys("-")),
 			Up:       key.NewBinding(key.WithKeys("up"), key.WithHelp("↑/↓", "select")),
 			Down:     key.NewBinding(key.WithKeys("down")),
-			Enter:    key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "select")),
-			Esc:      key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "deselect")),
+			Next:     key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "switch pane")),
+			Prev:     key.NewBinding(key.WithKeys("shift+tab")),
 		},
 		logs:       []*server.Log{},
 		_selected:  lipgloss.NewStyle().Background(faded),
@@ -95,21 +95,23 @@ func (m *logsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keyMap.Increase):
-			if m.hm > 6 {
-				m.hd += 2
-				m.hm -= 2
-				m.main.Height = m.hm
-				m.details.Height = m.hd
-			}
-		case key.Matches(msg, m.keyMap.Decrease):
 			if m.hd > 6 {
 				m.hd -= 2
 				m.hm += 2
 				m.main.Height = m.hm
 				m.details.Height = m.hd
 			}
-		case key.Matches(msg, m.keyMap.Esc):
-			m.selectLog(nil)
+		case key.Matches(msg, m.keyMap.Decrease):
+			if m.hm > 6 {
+				m.hd += 2
+				m.hm -= 2
+				m.main.Height = m.hm
+				m.details.Height = m.hd
+			}
+		case key.Matches(msg, m.keyMap.Next):
+			m.mode = (m.mode + 1) % 2
+		case key.Matches(msg, m.keyMap.Prev):
+			m.mode = (m.mode - 1) % 2
 		case key.Matches(msg, m.keyMap.Up):
 			m.selectUp()
 		case key.Matches(msg, m.keyMap.Down):
@@ -218,7 +220,7 @@ func (m *logsModel) renderDetails() {
 	ts := m.selectedLog.Log.Timestamp().AsTime()
 	tsobserved := m.selectedLog.Log.ObservedTimestamp().AsTime()
 
-	t := tree.Root(m.selectedLog.Log.Body().Str()).
+	t := tree.Root("Body: " + m.selectedLog.Log.Body().Str()).
 		Child("Time: " + ts.Format(time.RFC3339)).
 		Child(fmt.Sprintf("Time (Observed): %s (%s)", tsobserved.Format(time.RFC3339), tsobserved.Sub(ts))).
 		Child(fmt.Sprintf("Time (Arrived): %s (%s)", m.selectedLog.Received.Format(time.RFC3339), m.selectedLog.Received.Sub(ts))).
