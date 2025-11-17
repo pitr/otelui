@@ -49,7 +49,7 @@ func newRootModel() tea.Model {
 		keyMap: keyMapRoot{
 			Next: key.NewBinding(key.WithKeys("]"), key.WithHelp("[/]", "switch mode")),
 			Prev: key.NewBinding(key.WithKeys("[")),
-			Quit: key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit")),
+			Quit: key.NewBinding(key.WithKeys("ctrl+c", "q")),
 		},
 		help:      help.New(),
 		topoffset: 2,
@@ -116,7 +116,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	stats := fmt.Sprintf("payloads=%d logs=%d traces=%d metrics=%d", m.ce.Payloads, m.ce.Logs, m.ce.Traces, m.ce.Metrics)
+	stats := fmt.Sprintf("payloads=%d logs=%d spans=%d metrics=%d", m.ce.Payloads, m.ce.Logs, m.ce.Spans, m.ce.Metrics)
 	m.help.Width = m.w - lipgloss.Width(stats) - 3
 
 	keys := m.keyMap.Help()

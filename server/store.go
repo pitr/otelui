@@ -6,28 +6,27 @@ import (
 	"time"
 
 	"github.com/zhangyunhao116/skipmap"
-	"go.opentelemetry.io/collector/pdata/plog"
-	"go.opentelemetry.io/collector/pdata/pmetric"
-	"go.opentelemetry.io/collector/pdata/ptrace"
+	logs "go.opentelemetry.io/proto/otlp/logs/v1"
+	metrics "go.opentelemetry.io/proto/otlp/metrics/v1"
+	traces "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 type Log struct {
 	Received     time.Time
-	Log          *plog.LogRecord
-	ResourceLogs *plog.ResourceLogs
-	ScopeLogs    *plog.ScopeLogs
+	Log          *logs.LogRecord
+	ResourceLogs *logs.ResourceLogs
+	ScopeLogs    *logs.ScopeLogs
 }
 
 var storage struct {
 	sync.RWMutex
 
-	logsReceived    int
-	tracesReceived  int
-	metricsReceived int
+	payloadsReceived int
+	logsReceived     int
+	spansReceived    int
+	metricsReceived  int
 
 	logs *skipmap.Uint64Map[*Log]
-
-	payloads []any
 }
 
 var Send func(msg any)
@@ -36,67 +35,95 @@ func init() {
 	storage.logs = skipmap.NewUint64[*Log]()
 }
 
-func consumeLogs(p plog.Logs) error {
-	storage.Lock()
-	storage.logsReceived += p.LogRecordCount()
-	storage.payloads = append(storage.payloads, p)
-	Send(ConsumeEvent{
-		Payloads: len(storage.payloads),
-		Logs:     storage.logsReceived,
-		Traces:   storage.tracesReceived,
-		Metrics:  storage.metricsReceived,
-	})
-	storage.Unlock()
+func consumeLogs(p []*logs.ResourceLogs) {
+	if p == nil {
+		return
+	}
 
+	logsReceived := 0
 	now := time.Now().UTC()
 
-	for _, rl := range p.ResourceLogs().All() {
-		for _, sl := range rl.ScopeLogs().All() {
-			for _, l := range sl.LogRecords().All() {
-				storage.logs.Store(uint64(math.MaxUint64-l.Timestamp()), &Log{
-					Log:          &l,
-					ResourceLogs: &rl,
-					ScopeLogs:    &sl,
+	for _, rl := range p {
+		for _, sl := range rl.ScopeLogs {
+			logsReceived += len(sl.LogRecords)
+
+			for _, l := range sl.LogRecords {
+				storage.logs.Store(uint64(math.MaxUint64-l.TimeUnixNano), &Log{
+					Log:          l,
+					ResourceLogs: rl,
+					ScopeLogs:    sl,
 					Received:     now,
 				})
 			}
 		}
 	}
-	return nil
-}
 
-func consumeTraces(p ptrace.Traces) error {
 	storage.Lock()
-	storage.tracesReceived += p.SpanCount()
-	storage.payloads = append(storage.payloads, p)
+	defer storage.Unlock()
+	storage.logsReceived += logsReceived
+	storage.payloadsReceived++
 	Send(ConsumeEvent{
-		Payloads: len(storage.payloads),
+		Payloads: storage.payloadsReceived,
 		Logs:     storage.logsReceived,
-		Traces:   storage.tracesReceived,
+		Spans:    storage.spansReceived,
 		Metrics:  storage.metricsReceived,
 	})
-	storage.Unlock()
-	return nil
 }
 
-func consumeMetrics(p pmetric.Metrics) error {
+func consumeTraces(p []*traces.ResourceSpans) {
+	if p == nil {
+		return
+	}
+
+	spansReceived := 0
+
+	for _, rs := range p {
+		for _, ss := range rs.ScopeSpans {
+			spansReceived += len(ss.Spans)
+		}
+	}
+
 	storage.Lock()
-	storage.metricsReceived += p.MetricCount()
-	storage.payloads = append(storage.payloads, p)
+	defer storage.Unlock()
+	storage.spansReceived += spansReceived
+	storage.payloadsReceived++
 	Send(ConsumeEvent{
-		Payloads: len(storage.payloads),
+		Payloads: storage.payloadsReceived,
 		Logs:     storage.logsReceived,
-		Traces:   storage.tracesReceived,
+		Spans:    storage.spansReceived,
 		Metrics:  storage.metricsReceived,
 	})
-	storage.Unlock()
-	return nil
+}
+
+func consumeMetrics(p []*metrics.ResourceMetrics) {
+	if p == nil {
+		return
+	}
+
+	metricsReceived := 0
+
+	for _, rm := range p {
+		for _, sm := range rm.ScopeMetrics {
+			metricsReceived += len(sm.Metrics)
+		}
+	}
+
+	storage.Lock()
+	defer storage.Unlock()
+	storage.metricsReceived += metricsReceived
+	storage.payloadsReceived++
+	Send(ConsumeEvent{
+		Payloads: storage.payloadsReceived,
+		Logs:     storage.logsReceived,
+		Spans:    storage.spansReceived,
+		Metrics:  storage.metricsReceived,
+	})
 }
 
 type ConsumeEvent struct {
 	Payloads int
 	Logs     int
-	Traces   int
+	Spans    int
 	Metrics  int
 }
 
