@@ -39,6 +39,7 @@ func (k keyMapLogs) Help() []key.Binding {
 type QueriedLogs []*server.Log
 
 type logsModel struct {
+	lastLogs    int
 	mode        mLogs
 	hm, hd      int
 	w           int
@@ -53,7 +54,6 @@ type logsModel struct {
 }
 
 func newLogsModel() tea.Model {
-	faded := lipgloss.AdaptiveColor{Light: "#B2B2B2", Dark: "#4A4A4A"}
 	return &logsModel{
 		keyMap: keyMapLogs{
 			Increase: key.NewBinding(key.WithKeys("+"), key.WithHelp("+/-", "resize")),
@@ -64,9 +64,9 @@ func newLogsModel() tea.Model {
 			Prev:     key.NewBinding(key.WithKeys("shift+tab")),
 		},
 		logs:       []*server.Log{},
-		_selected:  lipgloss.NewStyle().Background(faded),
+		_selected:  lipgloss.NewStyle().Background(fadedColor),
 		_focused:   lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
-		_unfocused: lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(faded),
+		_unfocused: lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(fadedColor),
 		main:       viewport.New(10, 10),
 		details:    viewport.New(10, 10),
 	}
@@ -131,7 +131,10 @@ func (m *logsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 	case server.ConsumeEvent:
-		return m, func() tea.Msg { return QueriedLogs(server.QueryLogs(100)) }
+		if msg.Logs != m.lastLogs {
+			m.lastLogs = msg.Logs
+			return m, func() tea.Msg { return QueriedLogs(server.QueryLogs(100)) }
+		}
 	case QueriedLogs:
 		m.logs = msg
 		m.renderMain()

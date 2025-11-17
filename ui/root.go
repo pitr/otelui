@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -29,7 +30,7 @@ type keyMapRoot struct {
 }
 
 func (k keyMapRoot) Help() []key.Binding {
-	return []key.Binding{k.Quit, k.Next}
+	return []key.Binding{k.Next}
 }
 
 type model struct {
@@ -40,8 +41,10 @@ type model struct {
 	w         int
 	topoffset int
 	models    map[mRoot]tea.Model
+	menus     []string
 	_selected lipgloss.Style
 	ce        server.ConsumeEvent
+	status    string
 }
 
 func newRootModel() tea.Model {
@@ -59,10 +62,14 @@ func newRootModel() tea.Model {
 			mRootMetrics:  newMetricsModel(),
 			mRootPayloads: newPayloadsModel(),
 		},
-		_selected: lipgloss.NewStyle().
-			Background(lipgloss.Color("7")).
-			Foreground(lipgloss.Color("0")).
-			Bold(true),
+		menus: []string{
+			"   Logs   ",
+			"  Traces  ",
+			" Metrics ",
+			" Payloads ",
+		},
+		status:    "waiting for data...",
+		_selected: lipgloss.NewStyle().Background(fadedColor).Bold(true),
 	}
 }
 
@@ -82,6 +89,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case server.ConsumeEvent:
+		payloadsStyle := lipgloss.NewStyle()
+		logsStyle := lipgloss.NewStyle()
+		spansStyle := lipgloss.NewStyle()
+		metricsStyle := lipgloss.NewStyle()
+		if msg.Payloads != m.ce.Payloads {
+			payloadsStyle = payloadsStyle.Background(highlightColor)
+		}
+		if msg.Logs != m.ce.Logs {
+			logsStyle = logsStyle.Background(highlightColor)
+		}
+		if msg.Spans != m.ce.Spans {
+			spansStyle = spansStyle.Background(highlightColor)
+		}
+		if msg.Metrics != m.ce.Metrics {
+			metricsStyle = metricsStyle.Background(highlightColor)
+		}
+		m.status = fmt.Sprintf("payloads=%s logs=%s spans=%s metrics=%s", payloadsStyle.Render(strconv.Itoa(msg.Payloads)), logsStyle.Render(strconv.Itoa(msg.Logs)), spansStyle.Render(strconv.Itoa(msg.Spans)), metricsStyle.Render(strconv.Itoa(msg.Metrics)))
 		m.ce = msg
 		m.models[m.mode], cmd = m.models[m.mode].Update(msg)
 	case tea.WindowSizeMsg:
@@ -116,8 +140,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	stats := fmt.Sprintf("payloads=%d logs=%d spans=%d metrics=%d", m.ce.Payloads, m.ce.Logs, m.ce.Spans, m.ce.Metrics)
-	m.help.Width = m.w - lipgloss.Width(stats) - 3
+	m.help.Width = m.w - lipgloss.Width(m.status) - 3
 
 	keys := m.keyMap.Help()
 	if m, ok := m.models[m.mode].(Helpful); ok {
@@ -125,15 +148,15 @@ func (m model) View() string {
 	}
 	help := m.help.ShortHelpView(keys)
 
-	gap := strings.Repeat(" ", max(0, m.w-lipgloss.Width(help+stats)))
-	header := stats + gap + help
+	gap := strings.Repeat(" ", max(0, m.w-lipgloss.Width(help+m.status)))
+	header := m.status + gap + help
 
 	menu := ""
-	for i, mode := range []string{"Logs", "Traces", "Metrics", "Payloads"} {
+	for i, mode := range m.menus {
 		if m.mode == mRoot(i) {
-			menu += m._selected.Render("  " + mode + "  ")
+			menu += m._selected.Render(mode)
 		} else {
-			menu += "  " + mode + "  "
+			menu += mode
 		}
 	}
 	menu = lipgloss.PlaceHorizontal(m.w, lipgloss.Center, menu)

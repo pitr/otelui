@@ -33,6 +33,20 @@ var Send func(msg any)
 
 func init() {
 	storage.logs = skipmap.NewUint64[*Log]()
+
+	go func() {
+		for range time.Tick(time.Second) {
+			storage.Lock()
+			e := ConsumeEvent{
+				Payloads: storage.payloadsReceived,
+				Logs:     storage.logsReceived,
+				Spans:    storage.spansReceived,
+				Metrics:  storage.metricsReceived,
+			}
+			storage.Unlock()
+			Send(e)
+		}
+	}()
 }
 
 func consumeLogs(p []*logs.ResourceLogs) {
@@ -62,12 +76,6 @@ func consumeLogs(p []*logs.ResourceLogs) {
 	defer storage.Unlock()
 	storage.logsReceived += logsReceived
 	storage.payloadsReceived++
-	Send(ConsumeEvent{
-		Payloads: storage.payloadsReceived,
-		Logs:     storage.logsReceived,
-		Spans:    storage.spansReceived,
-		Metrics:  storage.metricsReceived,
-	})
 }
 
 func consumeTraces(p []*traces.ResourceSpans) {
@@ -87,12 +95,6 @@ func consumeTraces(p []*traces.ResourceSpans) {
 	defer storage.Unlock()
 	storage.spansReceived += spansReceived
 	storage.payloadsReceived++
-	Send(ConsumeEvent{
-		Payloads: storage.payloadsReceived,
-		Logs:     storage.logsReceived,
-		Spans:    storage.spansReceived,
-		Metrics:  storage.metricsReceived,
-	})
 }
 
 func consumeMetrics(p []*metrics.ResourceMetrics) {
@@ -112,12 +114,6 @@ func consumeMetrics(p []*metrics.ResourceMetrics) {
 	defer storage.Unlock()
 	storage.metricsReceived += metricsReceived
 	storage.payloadsReceived++
-	Send(ConsumeEvent{
-		Payloads: storage.payloadsReceived,
-		Logs:     storage.logsReceived,
-		Spans:    storage.spansReceived,
-		Metrics:  storage.metricsReceived,
-	})
 }
 
 type ConsumeEvent struct {

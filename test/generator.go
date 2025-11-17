@@ -55,6 +55,8 @@ func main() {
 			ctx, span := tracer.Start(context.Background(), "i-am-root")
 			span.SetStatus(codes.Error, "i-am-error")
 			slog.ErrorContext(ctx, "i-am-error", "i-am-attr", "i-am-val")
+			slog.WarnContext(ctx, "oops")
+			slog.DebugContext(ctx, "ok", "i-am-int", 42)
 			time.Sleep(3 * time.Nanosecond)
 			_, child := tracer.Start(ctx, "i-am-child")
 			time.Sleep(3 * time.Nanosecond)

@@ -6,7 +6,13 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/pitr/otelui/server"
+)
+
+var (
+	fadedColor     = lipgloss.AdaptiveColor{Light: "#B2B2B2", Dark: "#4A4A4A"}
+	highlightColor = lipgloss.AdaptiveColor{Light: "#874BFD", Dark: "#7D56F4"}
 )
 
 type Helpful interface {
