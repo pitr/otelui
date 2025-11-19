@@ -12,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/pitr/otelui/server"
+	"github.com/pitr/otelui/ui/components"
 )
 
 type mRoot uint
@@ -50,7 +51,7 @@ type model struct {
 func newRootModel() tea.Model {
 	return &model{
 		keyMap: keyMapRoot{
-			Next: key.NewBinding(key.WithKeys("]"), key.WithHelp("[/]", "switch mode")),
+			Next: key.NewBinding(key.WithKeys("]"), key.WithHelp("[ ]", "switch mode")),
 			Prev: key.NewBinding(key.WithKeys("[")),
 			Quit: key.NewBinding(key.WithKeys("ctrl+c", "q")),
 		},
@@ -69,7 +70,7 @@ func newRootModel() tea.Model {
 			" Payloads ",
 		},
 		status:    "waiting for data...",
-		_selected: lipgloss.NewStyle().Background(fadedColor).Bold(true),
+		_selected: lipgloss.NewStyle().Background(components.FadedColor).Bold(true),
 	}
 }
 
@@ -94,16 +95,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		spansStyle := lipgloss.NewStyle()
 		metricsStyle := lipgloss.NewStyle()
 		if msg.Payloads != m.ce.Payloads {
-			payloadsStyle = payloadsStyle.Background(highlightColor)
+			payloadsStyle = payloadsStyle.Background(components.HighlightColor)
 		}
 		if msg.Logs != m.ce.Logs {
-			logsStyle = logsStyle.Background(highlightColor)
+			logsStyle = logsStyle.Background(components.HighlightColor)
 		}
 		if msg.Spans != m.ce.Spans {
-			spansStyle = spansStyle.Background(highlightColor)
+			spansStyle = spansStyle.Background(components.HighlightColor)
 		}
 		if msg.Metrics != m.ce.Metrics {
-			metricsStyle = metricsStyle.Background(highlightColor)
+			metricsStyle = metricsStyle.Background(components.HighlightColor)
 		}
 		m.status = fmt.Sprintf("payloads=%s logs=%s spans=%s metrics=%s", payloadsStyle.Render(strconv.Itoa(msg.Payloads)), logsStyle.Render(strconv.Itoa(msg.Logs)), spansStyle.Render(strconv.Itoa(msg.Spans)), metricsStyle.Render(strconv.Itoa(msg.Metrics)))
 		m.ce = msg

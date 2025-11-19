@@ -7,20 +7,13 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/tree"
 	"github.com/pitr/otelui/server"
+	"github.com/pitr/otelui/ui/components"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 	plog "go.opentelemetry.io/proto/otlp/logs/v1"
-)
-
-type mLogs uint
-
-const (
-	mLogsFocusMain mLogs = iota
-	mLogsFocusDetails
 )
 
 type keyMapLogs struct {
@@ -40,21 +33,17 @@ type QueriedLogs []*server.Log
 
 type logsModel struct {
 	lastLogs    int
-	mode        mLogs
-	hm, hd      int
-	w           int
+	w, hm, hd   int
 	keyMap      keyMapLogs
 	logs        []*server.Log
 	selectedLog *server.Log
 	_selected   lipgloss.Style
-	_focused    lipgloss.Style
-	_unfocused  lipgloss.Style
-	main        viewport.Model
-	details     viewport.Model
+	main        components.Viewport
+	details     components.Viewport
 }
 
 func newLogsModel() tea.Model {
-	return &logsModel{
+	return logsModel{
 		keyMap: keyMapLogs{
 			Increase: key.NewBinding(key.WithKeys("+"), key.WithHelp("+/-", "resize")),
 			Decrease: key.NewBinding(key.WithKeys("-")),
@@ -63,69 +52,73 @@ func newLogsModel() tea.Model {
 			Next:     key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "switch pane")),
 			Prev:     key.NewBinding(key.WithKeys("shift+tab")),
 		},
-		logs:       []*server.Log{},
-		_selected:  lipgloss.NewStyle().Background(fadedColor),
-		_focused:   lipgloss.NewStyle().Border(lipgloss.RoundedBorder()),
-		_unfocused: lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(fadedColor),
-		main:       viewport.New(10, 10),
-		details:    viewport.New(10, 10),
+		logs:      []*server.Log{},
+		_selected: lipgloss.NewStyle().Background(components.FadedColor),
+		main:      components.NewViewport(true),
+		details:   components.NewViewport(false),
 	}
 }
 
-func (m *logsModel) Init() tea.Cmd {
+func (m logsModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m *logsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m logsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
+	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w = msg.Width
-		m.main.Width = msg.Width
-		m.details.Width = msg.Width
 		m.hm = msg.Height / 3 * 2
 		m.hd = msg.Height - m.hm
-		m.main.Height = m.hm
-		m.details.Height = m.hd
-		m.main.SetHorizontalStep(1)
-		m.main.MouseWheelDelta = 1
-		m.details.SetHorizontalStep(1)
-		m.details.MouseWheelDelta = 1
+		m.main, cmd = m.main.Update(tea.WindowSizeMsg{Width: m.w, Height: m.hm})
+		cmds = append(cmds, cmd)
+		m.details, cmd = m.details.Update(tea.WindowSizeMsg{Width: m.w, Height: m.hd})
+		cmds = append(cmds, cmd)
+		return m, tea.Batch(cmds...)
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keyMap.Increase):
 			if m.hd > 6 {
 				m.hd -= 2
 				m.hm += 2
-				m.main.Height = m.hm
-				m.details.Height = m.hd
+				m.main, cmd = m.main.Update(tea.WindowSizeMsg{Width: m.w, Height: m.hm})
+				cmds = append(cmds, cmd)
+				m.details, cmd = m.details.Update(tea.WindowSizeMsg{Width: m.w, Height: m.hd})
+				cmds = append(cmds, cmd)
+				return m, tea.Batch(cmds...)
 			}
 		case key.Matches(msg, m.keyMap.Decrease):
 			if m.hm > 6 {
 				m.hd += 2
 				m.hm -= 2
-				m.main.Height = m.hm
-				m.details.Height = m.hd
+				m.main, cmd = m.main.Update(tea.WindowSizeMsg{Width: m.w, Height: m.hm})
+				cmds = append(cmds, cmd)
+				m.details, cmd = m.details.Update(tea.WindowSizeMsg{Width: m.w, Height: m.hd})
+				cmds = append(cmds, cmd)
+				return m, tea.Batch(cmds...)
 			}
-		case key.Matches(msg, m.keyMap.Next):
-			m.mode = (m.mode + 1) % 2
-		case key.Matches(msg, m.keyMap.Prev):
-			m.mode = (m.mode - 1) % 2
-		case key.Matches(msg, m.keyMap.Up):
-			m.selectUp()
-		case key.Matches(msg, m.keyMap.Down):
-			m.selectDown()
+		case key.Matches(msg, m.keyMap.Next, m.keyMap.Prev):
+			m.main.IsFocused = !m.main.IsFocused
+			m.details.IsFocused = !m.details.IsFocused
+		default:
+			if m.main.IsFocused {
+				m.main, cmd = m.main.Update(msg)
+			} else {
+				m.details, cmd = m.details.Update(msg)
+			}
+			return m, cmd
 		}
 	case tea.MouseMsg:
-		if msg.Y >= m.hm && m.selectedLog != nil {
+		if msg.Y >= m.hm {
 			m.details, cmd = m.details.Update(msg)
 			return m, cmd
-		} else if msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionRelease {
-			offset := m.main.YOffset - m.main.Style.GetBorderTopSize()
-			if len(m.logs) > msg.Y+offset {
-				m.selectLog(m.logs[msg.Y+offset])
-			}
+			// } else if msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionRelease {
+			// 	offset := m.main.YOffset - m.main.Style.GetBorderTopSize()
+			// 	if len(m.logs) > msg.Y+offset {
+			// 		m.selectLog(m.logs[msg.Y+offset])
+			// 	}
 		} else {
 			m.main, cmd = m.main.Update(msg)
 			return m, cmd
@@ -139,29 +132,21 @@ func (m *logsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.logs = msg
 		m.renderMain()
 	}
-	return m, nil
+	return m, cmd
 }
 
-func (m *logsModel) View() string {
-	switch m.mode {
-	case mLogsFocusMain:
-		m.main.Style = m._focused
-		m.details.Style = m._unfocused
-	case mLogsFocusDetails:
-		m.main.Style = m._unfocused
-		m.details.Style = m._focused
-	}
+func (m logsModel) View() string {
 	return m.main.View() + "\n" + m.details.View()
 }
 
-func (m *logsModel) selectLog(l *server.Log) {
-	m.selectedLog = l
-	if l == nil {
-		m.mode = mLogsFocusMain
-	}
-	m.renderMain()
-	m.renderDetails()
-}
+// func (m *logsModel) selectLog(l *server.Log) {
+// 	m.selectedLog = l
+// 	if l == nil {
+// 		m.mode = mLogsFocusMain
+// 	}
+// 	m.renderMain()
+// 	m.renderDetails()
+// }
 
 func (m *logsModel) renderMain() {
 	var buf strings.Builder
@@ -250,37 +235,6 @@ func (m *logsModel) renderDetails() {
 	m.details.SetContent(t.String())
 }
 
-func (m *logsModel) selectUp() {
-	if m.selectedLog == nil {
-		return
-	}
-	var prev *server.Log
-	for _, l := range m.logs {
-		if l == m.selectedLog && prev != nil {
-			m.selectLog(prev)
-			break
-		} else {
-			prev = l
-		}
-	}
-}
-
-func (m *logsModel) selectDown() {
-	if m.selectedLog == nil && len(m.logs) > 0 {
-		m.selectLog(m.logs[0])
-	} else if m.selectedLog != nil {
-		next := false
-		for _, l := range m.logs {
-			if l == m.selectedLog {
-				next = true
-			} else if next {
-				m.selectLog(l)
-				break
-			}
-		}
-	}
-}
-
-func (m *logsModel) Help() []key.Binding {
+func (m logsModel) Help() []key.Binding {
 	return m.keyMap.Help()
 }
