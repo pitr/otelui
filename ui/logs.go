@@ -107,7 +107,7 @@ func (m *logsModel) renderMain() {
 		svc := "-"
 		for _, attr := range l.ResourceLogs.Resource.Attributes {
 			if attr.Key == string(semconv.ServiceNameKey) {
-				svc = attr.Value.GetStringValue()
+				svc = AnyToString(attr.Value)
 				break
 			}
 		}
@@ -119,11 +119,11 @@ func (m *logsModel) renderMain() {
 		if l == m.selectedLog {
 			buf.WriteString(m._selected.Render(str))
 			buf.WriteString(m._selected.Render(" "))
-			buf.WriteString(m._selected.Render(l.Log.Body.GetStringValue()))
+			buf.WriteString(m._selected.Render(AnyToString(l.Log.Body)))
 		} else {
 			buf.WriteString(str)
 			buf.WriteByte(' ')
-			buf.WriteString(l.Log.Body.GetStringValue())
+			buf.WriteString(AnyToString(l.Log.Body))
 		}
 	}
 	m.view.Get(0).SetContent(buf.String())
@@ -137,20 +137,20 @@ func (m *logsModel) renderDetails() {
 
 	attrs := tree.New().Root("Attributes")
 	for _, a := range m.selectedLog.Log.Attributes {
-		attrs = attrs.Child(fmt.Sprintf("%s: %s", a.Key, a.Value.GetStringValue()))
+		attrs = attrs.Child(fmt.Sprintf("%s: %s", a.Key, AnyToString(a.Value)))
 	}
 	sattrs := tree.New().Root("Attributes")
 	for _, a := range m.selectedLog.ScopeLogs.Scope.Attributes {
-		sattrs = sattrs.Child(fmt.Sprintf("%s: %s", a.Key, a.Value.GetStringValue()))
+		sattrs = sattrs.Child(fmt.Sprintf("%s: %s", a.Key, AnyToString(a.Value)))
 	}
 	rattrs := tree.New().Root("Attributes")
 	for _, a := range m.selectedLog.ResourceLogs.Resource.Attributes {
-		rattrs = rattrs.Child(fmt.Sprintf("%s: %s", a.Key, a.Value.GetStringValue()))
+		rattrs = rattrs.Child(fmt.Sprintf("%s: %s", a.Key, AnyToString(a.Value)))
 	}
 	ts := time.Unix(0, int64(m.selectedLog.Log.TimeUnixNano))
 	tsobserved := time.Unix(0, int64(m.selectedLog.Log.ObservedTimeUnixNano))
 
-	t := tree.Root("Body: " + m.selectedLog.Log.Body.GetStringValue()).
+	t := tree.Root("Body: " + AnyToString(m.selectedLog.Log.Body)).
 		Child("Time: " + ts.Format(time.RFC3339)).
 		Child(fmt.Sprintf("Time (Observed): %s (%s)", tsobserved.Format(time.RFC3339), tsobserved.Sub(ts))).
 		Child(fmt.Sprintf("Time (Arrived): %s (%s)", m.selectedLog.Received.Format(time.RFC3339), m.selectedLog.Received.Sub(ts))).
