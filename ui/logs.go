@@ -21,10 +21,6 @@ type keyMapLogs struct {
 	Down key.Binding
 }
 
-func (k keyMapLogs) Help() []key.Binding {
-	return []key.Binding{k.Up}
-}
-
 type QueriedLogs []*server.Log
 
 type logsModel struct {
@@ -175,5 +171,5 @@ func (m *logsModel) renderDetails() {
 }
 
 func (m logsModel) Help() []key.Binding {
-	return append(m.view.Help(), m.keyMap.Help()...)
+	return append(m.view.Help(), m.keyMap.Up)
 }

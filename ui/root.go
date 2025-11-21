@@ -30,10 +30,6 @@ type keyMapRoot struct {
 	Quit key.Binding
 }
 
-func (k keyMapRoot) Help() []key.Binding {
-	return []key.Binding{k.Next}
-}
-
 type model struct {
 	keyMap keyMapRoot
 	help   help.Model
@@ -83,9 +79,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case QueriedLogs:
+	case server.ConsumeEvent:
 	default:
-		start := time.Now()
-		defer func() { slog.Debug(fmt.Sprintf("%s to process %#v", time.Since(start), msg)) }()
+		defer func(start time.Time) { slog.Debug(fmt.Sprintf("%s to process %#v", time.Since(start), msg)) }(time.Now())
 	}
 
 	switch msg := msg.(type) {
@@ -141,9 +137,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
+	defer func(start time.Time) { slog.Debug(fmt.Sprintf("View() %s", time.Since(start))) }(time.Now())
+
 	m.help.Width = m.w - lipgloss.Width(m.status) - 3
 
-	keys := m.keyMap.Help()
+	keys := []key.Binding{m.keyMap.Next}
 	if m, ok := m.models[m.mode].(components.Helpful); ok {
 		keys = append(m.Help(), keys...)
 	}

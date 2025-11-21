@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -36,7 +37,7 @@ func main() {
 	ticker1 := time.NewTicker(1 * time.Second)
 	ticker2 := time.NewTicker(3 * time.Second)
 
-	println("starting")
+	id := 0
 
 	for {
 		select {
@@ -55,8 +56,9 @@ func main() {
 			ctx, span := tracer.Start(context.Background(), "i-am-root")
 			span.SetStatus(codes.Error, "i-am-error")
 			slog.ErrorContext(ctx, "i-am-error", "i-am-attr", "i-am-val")
-			slog.WarnContext(ctx, "oops")
-			slog.DebugContext(ctx, "ok", "i-am-int", 42)
+			slog.WarnContext(ctx, fmt.Sprintf("oops %d", id))
+			slog.DebugContext(ctx, fmt.Sprintf("ok %d", id), "i-am-int", 42)
+			id++
 			time.Sleep(3 * time.Nanosecond)
 			_, child := tracer.Start(ctx, "i-am-child")
 			time.Sleep(3 * time.Nanosecond)

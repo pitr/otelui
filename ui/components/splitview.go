@@ -22,28 +22,24 @@ type SplitableModel[V any] interface {
 	Helpful
 }
 
-type keysSplit struct {
+type keysSplitview struct {
 	Increase key.Binding
 	Decrease key.Binding
 	Next     key.Binding
 	Prev     key.Binding
 }
 
-func (k keysSplit) Help() []key.Binding {
-	return []key.Binding{k.Increase, k.Next}
-}
-
 type Splitview[T SplitableModel[T]] struct {
 	w, hm, hd int
 	views     [2]T
-	keyMap    keysSplit
+	keyMap    keysSplitview
 	_selected lipgloss.Style
 }
 
 func NewSplitview[T SplitableModel[T]](top, bottom T) Splitview[T] {
 	return Splitview[T]{
 		views: [2]T{top, bottom},
-		keyMap: keysSplit{
+		keyMap: keysSplitview{
 			Increase: key.NewBinding(key.WithKeys("+"), key.WithHelp("+/_", "resize")),
 			Decrease: key.NewBinding(key.WithKeys("_")),
 			Next:     key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "switch pane")),
@@ -140,7 +136,7 @@ func (m *Splitview[T]) Get(i int) T {
 }
 
 func (m Splitview[T]) Help() []key.Binding {
-	keys := m.keyMap.Help()
+	keys := []key.Binding{m.keyMap.Increase, m.keyMap.Next}
 	for i := range m.views {
 		if m.views[i].IsFocused() {
 			keys = append(m.views[i].Help(), keys...)
