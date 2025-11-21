@@ -96,11 +96,11 @@ func (m *logsModel) renderMain() {
 		s := lipgloss.NewStyle()
 		switch {
 		case l.Log.SeverityNumber >= plog.SeverityNumber_SEVERITY_NUMBER_ERROR:
-			s = s.Foreground(lipgloss.Color("9"))
+			s = s.Foreground(lipgloss.Color("#FF6B6B"))
 		case l.Log.SeverityNumber >= plog.SeverityNumber_SEVERITY_NUMBER_WARN:
-			s = s.Foreground(lipgloss.Color("11"))
+			s = s.Foreground(lipgloss.Color("#FFD93D"))
 		case l.Log.SeverityNumber >= plog.SeverityNumber_SEVERITY_NUMBER_INFO:
-			s = s.Foreground(lipgloss.Color("14"))
+			s = s.Foreground(lipgloss.Color("#0f93fc"))
 		case l.Log.SeverityNumber >= plog.SeverityNumber_SEVERITY_NUMBER_DEBUG:
 			s = s.Foreground(lipgloss.Color("15"))
 		}
