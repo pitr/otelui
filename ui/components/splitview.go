@@ -143,7 +143,7 @@ func (m Splitview[T]) Help() []key.Binding {
 	keys := m.keyMap.Help()
 	for i := range m.views {
 		if m.views[i].IsFocused() {
-			keys = append(keys, m.views[i].Help()...)
+			keys = append(m.views[i].Help(), keys...)
 			break
 		}
 	}

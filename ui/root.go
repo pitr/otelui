@@ -145,7 +145,7 @@ func (m model) View() string {
 
 	keys := m.keyMap.Help()
 	if m, ok := m.models[m.mode].(components.Helpful); ok {
-		keys = append(keys, m.Help()...)
+		keys = append(m.Help(), keys...)
 	}
 	help := m.help.ShortHelpView(keys)
 

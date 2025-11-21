@@ -175,5 +175,5 @@ func (m *logsModel) renderDetails() {
 }
 
 func (m logsModel) Help() []key.Binding {
-	return append(m.keyMap.Help(), m.view.Help()...)
+	return append(m.view.Help(), m.keyMap.Help()...)
 }
