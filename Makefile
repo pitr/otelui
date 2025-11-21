@@ -1,7 +1,9 @@
 .PHONY: build run
 
-build:
-	go build -o tmp/otelui main.go
+SOURCES       = $(shell find . -name '*.go')
 
-run:
+run: build
 	tmp/otelui
+
+build: $(SOURCES)
+	go build -o tmp/otelui main.go

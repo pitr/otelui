@@ -3,13 +3,14 @@ package components
 import (
 	"strings"
 
+	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
 
 type Viewport struct {
-	IsFocused bool
+	isFocused bool
 
 	w, h       int
 	_border    lipgloss.Border
@@ -23,9 +24,9 @@ type Viewport struct {
 	longestLineWidth int
 }
 
-func NewViewport(focused bool) Viewport {
-	return Viewport{
-		IsFocused:  focused,
+func NewViewport(focused bool) *Viewport {
+	return &Viewport{
+		isFocused:  focused,
 		_border:    lipgloss.RoundedBorder(),
 		_focused:   lipgloss.NewStyle(),
 		_unfocused: lipgloss.NewStyle().BorderForeground(FadedColor),
@@ -36,7 +37,7 @@ func (v Viewport) Init() tea.Cmd {
 	return nil
 }
 
-func (v Viewport) Update(msg tea.Msg) (Viewport, tea.Cmd) {
+func (v *Viewport) Update(msg tea.Msg) tea.Cmd {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
@@ -84,12 +85,12 @@ func (v Viewport) Update(msg tea.Msg) (Viewport, tea.Cmd) {
 		}
 	}
 
-	return v, cmd
+	return cmd
 }
 
-func (v Viewport) View() string {
+func (v *Viewport) View() string {
 	s := v._unfocused
-	if v.IsFocused {
+	if v.isFocused {
 		s = v._focused
 	}
 	s = s.Border(v._border, true, false, false, true)
@@ -172,6 +173,18 @@ func (v *Viewport) SetContent(s string) {
 	if v.yOffset > len(v.lines)-1 {
 		v.SetYOffset(v.maxYOffset())
 	}
+}
+
+func (v Viewport) IsFocused() bool {
+	return v.isFocused
+}
+
+func (v *Viewport) SetFocus(b bool) {
+	v.isFocused = b
+}
+
+func (v Viewport) Help() []key.Binding {
+	return nil
 }
 
 func (v Viewport) visibleLines() (lines []string) {

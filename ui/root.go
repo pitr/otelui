@@ -144,7 +144,7 @@ func (m model) View() string {
 	m.help.Width = m.w - lipgloss.Width(m.status) - 3
 
 	keys := m.keyMap.Help()
-	if m, ok := m.models[m.mode].(Helpful); ok {
+	if m, ok := m.models[m.mode].(components.Helpful); ok {
 		keys = append(keys, m.Help()...)
 	}
 	help := m.help.ShortHelpView(keys)

@@ -17,45 +17,37 @@ import (
 )
 
 type keyMapLogs struct {
-	Increase key.Binding
-	Decrease key.Binding
-	Up       key.Binding
-	Down     key.Binding
-	Next     key.Binding
-	Prev     key.Binding
+	Up   key.Binding
+	Down key.Binding
 }
 
 func (k keyMapLogs) Help() []key.Binding {
-	return []key.Binding{k.Increase, k.Up, k.Next}
+	return []key.Binding{k.Up}
 }
 
 type QueriedLogs []*server.Log
 
 type logsModel struct {
 	lastLogs    int
-	w, hm, hd   int
 	keyMap      keyMapLogs
 	logs        []*server.Log
 	selectedLog *server.Log
 	_selected   lipgloss.Style
-	main        components.Viewport
-	details     components.Viewport
+	view        components.Splitview[*components.Viewport]
 }
 
 func newLogsModel() tea.Model {
 	return logsModel{
 		keyMap: keyMapLogs{
-			Increase: key.NewBinding(key.WithKeys("+"), key.WithHelp("+/-", "resize")),
-			Decrease: key.NewBinding(key.WithKeys("-")),
-			Up:       key.NewBinding(key.WithKeys("up"), key.WithHelp("↑/↓", "select")),
-			Down:     key.NewBinding(key.WithKeys("down")),
-			Next:     key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "switch pane")),
-			Prev:     key.NewBinding(key.WithKeys("shift+tab")),
+			Up:   key.NewBinding(key.WithKeys("up"), key.WithHelp("↑/↓", "select")),
+			Down: key.NewBinding(key.WithKeys("down")),
 		},
 		logs:      []*server.Log{},
 		_selected: lipgloss.NewStyle().Background(components.FadedColor),
-		main:      components.NewViewport(true),
-		details:   components.NewViewport(false),
+		view: components.NewSplitview(
+			components.NewViewport(true),
+			components.NewViewport(false),
+		),
 	}
 }
 
@@ -65,64 +57,8 @@ func (m logsModel) Init() tea.Cmd {
 
 func (m logsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.w = msg.Width
-		m.hm = msg.Height / 3 * 2
-		m.hd = msg.Height - m.hm
-		m.main, cmd = m.main.Update(tea.WindowSizeMsg{Width: m.w, Height: m.hm})
-		cmds = append(cmds, cmd)
-		m.details, cmd = m.details.Update(tea.WindowSizeMsg{Width: m.w, Height: m.hd})
-		cmds = append(cmds, cmd)
-		return m, tea.Batch(cmds...)
-	case tea.KeyMsg:
-		switch {
-		case key.Matches(msg, m.keyMap.Increase):
-			if m.hd > 6 {
-				m.hd -= 2
-				m.hm += 2
-				m.main, cmd = m.main.Update(tea.WindowSizeMsg{Width: m.w, Height: m.hm})
-				cmds = append(cmds, cmd)
-				m.details, cmd = m.details.Update(tea.WindowSizeMsg{Width: m.w, Height: m.hd})
-				cmds = append(cmds, cmd)
-				return m, tea.Batch(cmds...)
-			}
-		case key.Matches(msg, m.keyMap.Decrease):
-			if m.hm > 6 {
-				m.hd += 2
-				m.hm -= 2
-				m.main, cmd = m.main.Update(tea.WindowSizeMsg{Width: m.w, Height: m.hm})
-				cmds = append(cmds, cmd)
-				m.details, cmd = m.details.Update(tea.WindowSizeMsg{Width: m.w, Height: m.hd})
-				cmds = append(cmds, cmd)
-				return m, tea.Batch(cmds...)
-			}
-		case key.Matches(msg, m.keyMap.Next, m.keyMap.Prev):
-			m.main.IsFocused = !m.main.IsFocused
-			m.details.IsFocused = !m.details.IsFocused
-		default:
-			if m.main.IsFocused {
-				m.main, cmd = m.main.Update(msg)
-			} else {
-				m.details, cmd = m.details.Update(msg)
-			}
-			return m, cmd
-		}
-	case tea.MouseMsg:
-		if msg.Y >= m.hm {
-			m.details, cmd = m.details.Update(msg)
-			return m, cmd
-			// } else if msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionRelease {
-			// 	offset := m.main.YOffset - m.main.Style.GetBorderTopSize()
-			// 	if len(m.logs) > msg.Y+offset {
-			// 		m.selectLog(m.logs[msg.Y+offset])
-			// 	}
-		} else {
-			m.main, cmd = m.main.Update(msg)
-			return m, cmd
-		}
 	case server.ConsumeEvent:
 		if msg.Logs != m.lastLogs {
 			m.lastLogs = msg.Logs
@@ -131,12 +67,15 @@ func (m logsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case QueriedLogs:
 		m.logs = msg
 		m.renderMain()
+	default:
+		m.view, cmd = m.view.Update(msg)
+		return m, cmd
 	}
 	return m, cmd
 }
 
 func (m logsModel) View() string {
-	return m.main.View() + "\n" + m.details.View()
+	return m.view.View()
 }
 
 // func (m *logsModel) selectLog(l *server.Log) {
@@ -187,12 +126,12 @@ func (m *logsModel) renderMain() {
 			buf.WriteString(l.Log.Body.GetStringValue())
 		}
 	}
-	m.main.SetContent(buf.String())
+	m.view.Get(0).SetContent(buf.String())
 }
 
 func (m *logsModel) renderDetails() {
 	if m.selectedLog == nil {
-		m.details.SetContent("")
+		m.view.Get(1).SetContent("")
 		return
 	}
 
@@ -232,9 +171,9 @@ func (m *logsModel) renderDetails() {
 	if len(m.selectedLog.Log.SpanId) != 0 {
 		t.Child("SpanID: " + hex.EncodeToString(m.selectedLog.Log.SpanId))
 	}
-	m.details.SetContent(t.String())
+	m.view.Get(1).SetContent(t.String())
 }
 
 func (m logsModel) Help() []key.Binding {
-	return m.keyMap.Help()
+	return append(m.keyMap.Help(), m.view.Help()...)
 }
