@@ -120,6 +120,8 @@ func (v *Viewport) Update(msg tea.Msg) tea.Cmd {
 			v.xOffset = max(v.xOffset-1, 0)
 		case tea.MouseButtonWheelRight:
 			v.xOffset = min(v.xOffset+1, v.longestLineWidth-v.w)
+		case tea.MouseButtonLeft:
+			v.scrollTo(msg.Y + v.yOffset())
 		}
 	}
 
@@ -167,12 +169,15 @@ func (v *Viewport) SetContent(lines []ViewRow) {
 
 	if v.selected >= len(v.lines) {
 		v.scrollTo(len(v.lines) - 1)
+	} else {
+		v.scrollTo(v.selected)
 	}
 }
 
 func (v *Viewport) AddContent(lines []ViewRow) {
 	v.lines = append(v.lines, lines...)
 	v.longestLineWidth = max(v.longestLineWidth, v.findLongestLineWidth(lines))
+	v.scrollTo(v.selected)
 }
 
 func (v Viewport) IsFocused() bool {
@@ -190,31 +195,24 @@ func (v *Viewport) scrollTo(i int) {
 	}
 }
 
+func (v Viewport) yOffset() int {
+	top := max(0, v.selected-v.h/2)
+	if top+v.h > len(v.lines) {
+		top = max(0, len(v.lines)-v.h)
+	}
+	return top
+}
+
 func (v Viewport) visibleLines() (lines []string) {
-	if len(v.lines) > 0 {
-		top := max(0, v.selected-v.h/2)
-		if top+v.h > len(v.lines) {
-			top = max(0, len(v.lines)-v.h)
-		}
-		bottom := min(top+v.h, len(v.lines))
-		for i, l := range v.lines[top:bottom] {
-			if i+top == v.selected {
-				lines = append(lines, v._selected.Render(l.Str))
-			} else {
-				lines = append(lines, l.Str)
-			}
+	top := v.yOffset()
+	bottom := min(top+v.h, len(v.lines))
+	for i, l := range v.lines[top:bottom] {
+		lines = append(lines, ansi.Cut(l.Str, v.xOffset, v.xOffset+v.w))
+		if i+top == v.selected {
+			lines[i] = v._selected.Render(lipgloss.PlaceHorizontal(v.w, lipgloss.Left, lines[i]))
 		}
 	}
-
-	if (v.xOffset == 0 && v.longestLineWidth <= v.w) || v.w == 0 {
-		return lines
-	}
-
-	cutLines := make([]string, len(lines))
-	for i := range lines {
-		cutLines[i] = ansi.Cut(lines[i], v.xOffset, v.xOffset+v.w)
-	}
-	return cutLines
+	return lines
 }
 
 func (v *Viewport) findLongestLineWidth(lines []ViewRow) int {

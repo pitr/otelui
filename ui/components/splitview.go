@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	minSplit  = 6
-	splitStep = 2
+	minSplit        = 6
+	splitStep       = 2
+	splitBorderSize = 1
 )
 
 type SplitableModel[V any] interface {
@@ -96,18 +97,32 @@ func (m Splitview[T]) Update(msg tea.Msg) (Splitview[T], tea.Cmd) {
 			}
 		}
 	case tea.MouseMsg:
-		if msg.Y <= m.hm {
-			cmd = m.views[0].Update(msg)
-			return m, cmd
-		} else {
-			cmd = m.views[1].Update(msg)
-			return m, cmd
+		leftClick := msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress
+		view := 0
+		inside := false
+		switch {
+		case msg.Y > 0 && msg.Y < m.hm-splitBorderSize:
+			inside = true
+			view = 0
+			msg.Y -= splitBorderSize
+		case msg.Y > m.hm && msg.Y < m.hm+m.hd-splitBorderSize:
+			inside = true
+			msg.Y -= m.hm + splitBorderSize
+			fallthrough
+		case msg.Y == m.hm || msg.Y == m.hm+m.hd-splitBorderSize:
+			view = 1
 		}
-		// } else if msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionRelease {
-		// 	offset := m.main.YOffset - m.main.Style.GetBorderTopSize()
-		// 	if len(m.logs) > msg.Y+offset {
-		// 		m.selectLog(m.logs[msg.Y+offset])
-		// 	}
+
+		switch {
+		case leftClick:
+			m.views[1-view].SetFocus(false)
+			m.views[view].SetFocus(true)
+			fallthrough
+		default:
+			if inside {
+				cmd = m.views[view].Update(msg)
+			}
+		}
 	default:
 		for i := range m.views {
 			if m.views[i].IsFocused() {
@@ -122,12 +137,9 @@ func (m Splitview[T]) Update(msg tea.Msg) (Splitview[T], tea.Cmd) {
 
 func (m Splitview[T]) View() string {
 	var buf strings.Builder
-	for i := range m.views {
-		if i > 0 {
-			buf.WriteByte('\n')
-		}
-		buf.WriteString(m.views[i].View())
-	}
+	buf.WriteString(m.views[0].View())
+	buf.WriteByte('\n')
+	buf.WriteString(m.views[1].View())
 	return buf.String()
 }
 
