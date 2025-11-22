@@ -3,34 +3,70 @@ package components
 import (
 	"strings"
 
+	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
 
+type ViewRow struct {
+	Str  string
+	Yank string
+	Raw  any
+}
+
+type keysViewport struct {
+	Yank   key.Binding
+	Pgdown key.Binding
+	Pgup   key.Binding
+	Down   key.Binding
+	Up     key.Binding
+	Left   key.Binding
+	Right  key.Binding
+}
+
 type Viewport struct {
 	isFocused bool
+
+	onSelect func(ViewRow)
 
 	w, h       int
 	_border    lipgloss.Border
 	_focused   lipgloss.Style
 	_unfocused lipgloss.Style
+	_selected  lipgloss.Style
 
-	yOffset          int
+	keyMap keysViewport
+
+	selected         int
 	xOffset          int
-	yPosition        int
-	lines            []string
+	lines            []ViewRow
 	longestLineWidth int
 }
 
-func NewViewport(focused bool) *Viewport {
+func NewViewport(focused bool, onselect func(ViewRow)) *Viewport {
 	return &Viewport{
-		isFocused:  focused,
+		isFocused: focused,
+		onSelect:  onselect,
+		keyMap: keysViewport{
+			Yank:   key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "copy")),
+			Pgdown: key.NewBinding(key.WithKeys("pgdown", " ")),
+			Pgup:   key.NewBinding(key.WithKeys("pgup")),
+			Down:   key.NewBinding(key.WithKeys("down")),
+			Up:     key.NewBinding(key.WithKeys("up")),
+			Left:   key.NewBinding(key.WithKeys("left")),
+			Right:  key.NewBinding(key.WithKeys("right")),
+		},
 		_border:    lipgloss.RoundedBorder(),
 		_focused:   lipgloss.NewStyle(),
 		_unfocused: lipgloss.NewStyle().BorderForeground(FadedColor),
+		_selected:  lipgloss.NewStyle().Background(FadedColor),
 	}
+}
+
+func (v Viewport) Help() []key.Binding {
+	return []key.Binding{v.keyMap.Yank}
 }
 
 func (v Viewport) Init() tea.Cmd {
@@ -45,21 +81,24 @@ func (v *Viewport) Update(msg tea.Msg) tea.Cmd {
 		v.w = msg.Width - 2
 		v.h = msg.Height - 2
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "pgdown", " ":
-			v.ScrollDown(v.h)
-		case "pgup":
-			v.ScrollUp(v.h)
-		case "down":
-			v.ScrollDown(1)
-		case "up":
-			v.ScrollUp(1)
-		case "left":
-			v.ScrollLeft(1)
-		case "right":
-			v.ScrollRight(1)
+		switch {
+		case key.Matches(msg, v.keyMap.Pgdown):
+			v.scrollTo(v.selected + v.h)
+		case key.Matches(msg, v.keyMap.Pgup):
+			v.scrollTo(v.selected - v.h)
+		case key.Matches(msg, v.keyMap.Down):
+			v.scrollTo(v.selected + 1)
+		case key.Matches(msg, v.keyMap.Up):
+			v.scrollTo(v.selected - 1)
+		case key.Matches(msg, v.keyMap.Left):
+			v.xOffset = max(v.xOffset-1, 0)
+		case key.Matches(msg, v.keyMap.Right):
+			v.xOffset = min(v.xOffset+1, v.longestLineWidth-v.w)
+		case key.Matches(msg, v.keyMap.Yank):
+			if len(v.lines) > 0 {
+				clipboard.WriteAll(v.lines[v.selected].Yank)
+			}
 		}
-
 	case tea.MouseMsg:
 		if msg.Action != tea.MouseActionPress {
 			break
@@ -67,21 +106,20 @@ func (v *Viewport) Update(msg tea.Msg) tea.Cmd {
 		switch msg.Button {
 		case tea.MouseButtonWheelUp:
 			if msg.Shift {
-				v.ScrollLeft(1)
+				v.xOffset = max(v.xOffset-1, 0)
 			} else {
-				v.ScrollUp(1)
+				v.scrollTo(v.selected - 1)
 			}
-
 		case tea.MouseButtonWheelDown:
 			if msg.Shift {
-				v.ScrollRight(1)
+				v.xOffset = min(v.xOffset+1, v.longestLineWidth-v.w)
 			} else {
-				v.ScrollDown(1)
+				v.scrollTo(v.selected + 1)
 			}
 		case tea.MouseButtonWheelLeft:
-			v.ScrollLeft(1)
+			v.xOffset = max(v.xOffset-1, 0)
 		case tea.MouseButtonWheelRight:
-			v.ScrollRight(1)
+			v.xOffset = min(v.xOffset+1, v.longestLineWidth-v.w)
 		}
 	}
 
@@ -94,6 +132,7 @@ func (v *Viewport) View() string {
 		s = v._focused
 	}
 	s = s.Border(v._border, true, false, false, true)
+	lines := v.visibleLines()
 	return lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		lipgloss.JoinVertical(
@@ -101,7 +140,7 @@ func (v *Viewport) View() string {
 			s.Render(lipgloss.NewStyle().
 				Width(v.w).MaxWidth(v.w).
 				Height(v.h).MaxHeight(v.h).
-				Render(strings.Join(v.visibleLines(), "\n"))),
+				Render(strings.Join(lines, "\n"))),
 			Scrollbar(
 				s,
 				ScrollbarHorizontal,
@@ -116,63 +155,24 @@ func (v *Viewport) View() string {
 			ScrollbarVertical,
 			v.h,
 			len(v.lines),
-			len(v.visibleLines()),
-			v.yOffset,
-		))
+			len(lines),
+			v.selected,
+		),
+	)
 }
 
-func (v Viewport) AtTop() bool {
-	return v.yOffset <= 0
-}
+func (v *Viewport) SetContent(lines []ViewRow) {
+	v.lines = lines
+	v.longestLineWidth = v.findLongestLineWidth(lines)
 
-func (v Viewport) AtBottom() bool {
-	return v.yOffset >= v.maxYOffset()
-}
-
-func (v *Viewport) SetYOffset(n int) {
-	v.yOffset = clamp(n, 0, v.maxYOffset())
-}
-
-func (v *Viewport) ScrollDown(n int) {
-	if v.AtBottom() || n == 0 || len(v.lines) == 0 {
-		return
+	if v.selected >= len(v.lines) {
+		v.scrollTo(len(v.lines) - 1)
 	}
-
-	v.SetYOffset(v.yOffset + n)
 }
 
-func (v *Viewport) ScrollUp(n int) {
-	if v.AtTop() || n == 0 || len(v.lines) == 0 {
-		return
-	}
-
-	v.SetYOffset(v.yOffset - n)
-}
-
-func (v *Viewport) SetXOffset(n int) {
-	v.xOffset = clamp(n, 0, v.longestLineWidth-v.w)
-}
-
-func (v *Viewport) ScrollLeft(n int) {
-	v.SetXOffset(v.xOffset - n)
-}
-
-func (v *Viewport) ScrollRight(n int) {
-	v.SetXOffset(v.xOffset + n)
-}
-
-func (v Viewport) maxYOffset() int {
-	return max(0, len(v.lines)-v.h)
-}
-
-func (v *Viewport) SetContent(s string) {
-	s = strings.ReplaceAll(s, "\r\n", "\n")
-	v.lines = strings.Split(s, "\n")
-	v.longestLineWidth = v.findLongestLineWidth(v.lines)
-
-	if v.yOffset > len(v.lines)-1 {
-		v.SetYOffset(v.maxYOffset())
-	}
+func (v *Viewport) AddContent(lines []ViewRow) {
+	v.lines = append(v.lines, lines...)
+	v.longestLineWidth = max(v.longestLineWidth, v.findLongestLineWidth(lines))
 }
 
 func (v Viewport) IsFocused() bool {
@@ -183,15 +183,27 @@ func (v *Viewport) SetFocus(b bool) {
 	v.isFocused = b
 }
 
-func (v Viewport) Help() []key.Binding {
-	return nil
+func (v *Viewport) scrollTo(i int) {
+	v.selected = max(0, min(i, len(v.lines)-1))
+	if len(v.lines) > 0 && v.onSelect != nil {
+		v.onSelect(v.lines[v.selected])
+	}
 }
 
 func (v Viewport) visibleLines() (lines []string) {
 	if len(v.lines) > 0 {
-		top := max(0, v.yOffset)
-		bottom := clamp(v.yOffset+v.h, top, len(v.lines))
-		lines = v.lines[top:bottom]
+		top := max(0, v.selected-v.h/2)
+		if top+v.h > len(v.lines) {
+			top = max(0, len(v.lines)-v.h)
+		}
+		bottom := min(top+v.h, len(v.lines))
+		for i, l := range v.lines[top:bottom] {
+			if i+top == v.selected {
+				lines = append(lines, v._selected.Render(l.Str))
+			} else {
+				lines = append(lines, l.Str)
+			}
+		}
 	}
 
 	if (v.xOffset == 0 && v.longestLineWidth <= v.w) || v.w == 0 {
@@ -205,19 +217,12 @@ func (v Viewport) visibleLines() (lines []string) {
 	return cutLines
 }
 
-func (v *Viewport) findLongestLineWidth(lines []string) int {
+func (v *Viewport) findLongestLineWidth(lines []ViewRow) int {
 	w := 0
 	for _, l := range lines {
-		if ww := ansi.StringWidth(l); ww > w {
+		if ww := ansi.StringWidth(l.Str); ww > w {
 			w = ww
 		}
 	}
 	return w
-}
-
-func clamp(v, low, high int) int {
-	if high < low {
-		low, high = high, low
-	}
-	return min(high, max(low, v))
 }

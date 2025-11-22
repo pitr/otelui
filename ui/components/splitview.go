@@ -54,12 +54,11 @@ func (m Splitview[T]) Init() tea.Cmd {
 
 func (m Splitview[T]) Update(msg tea.Msg) (Splitview[T], tea.Cmd) {
 	var cmd tea.Cmd
-	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w = msg.Width
-		m.hm = msg.Height / 3 * 2
+		m.hm = msg.Height / 2
 		m.hd = msg.Height - m.hm
 		cmd = tea.Batch(
 			m.views[0].Update(tea.WindowSizeMsg{Width: m.w, Height: m.hm}),
@@ -90,10 +89,11 @@ func (m Splitview[T]) Update(msg tea.Msg) (Splitview[T], tea.Cmd) {
 			m.views[1].SetFocus(!m.views[1].IsFocused())
 		default:
 			for i := range m.views {
-				cmd = m.views[i].Update(msg)
-				cmds = append(cmds, cmd)
+				if m.views[i].IsFocused() {
+					cmd = m.views[i].Update(msg)
+					break
+				}
 			}
-			cmd = tea.Batch(cmds...)
 		}
 	case tea.MouseMsg:
 		if msg.Y <= m.hm {

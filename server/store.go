@@ -1,11 +1,9 @@
 package server
 
 import (
-	"math"
 	"sync"
 	"time"
 
-	"github.com/zhangyunhao116/skipmap"
 	logs "go.opentelemetry.io/proto/otlp/logs/v1"
 	metrics "go.opentelemetry.io/proto/otlp/metrics/v1"
 	traces "go.opentelemetry.io/proto/otlp/trace/v1"
@@ -26,24 +24,24 @@ var storage struct {
 	spansReceived    int
 	metricsReceived  int
 
-	logs *skipmap.Uint64Map[*Log]
+	logs []*Log
 }
 
 var Send func(msg any)
 
 func init() {
-	storage.logs = skipmap.NewUint64[*Log]()
+	storage.logs = []*Log{}
 
 	go func() {
 		for range time.Tick(time.Second) {
-			storage.Lock()
+			storage.RLock()
 			e := ConsumeEvent{
 				Payloads: storage.payloadsReceived,
 				Logs:     storage.logsReceived,
 				Spans:    storage.spansReceived,
 				Metrics:  storage.metricsReceived,
 			}
-			storage.Unlock()
+			storage.RUnlock()
 			Send(e)
 		}
 	}()
@@ -54,15 +52,13 @@ func consumeLogs(p []*logs.ResourceLogs) {
 		return
 	}
 
-	logsReceived := 0
+	newLogs := []*Log{}
 	now := time.Now().UTC()
 
 	for _, rl := range p {
 		for _, sl := range rl.ScopeLogs {
-			logsReceived += len(sl.LogRecords)
-
 			for _, l := range sl.LogRecords {
-				storage.logs.Store(uint64(math.MaxUint64-l.TimeUnixNano), &Log{
+				newLogs = append(newLogs, &Log{
 					Log:          l,
 					ResourceLogs: rl,
 					ScopeLogs:    sl,
@@ -73,9 +69,14 @@ func consumeLogs(p []*logs.ResourceLogs) {
 	}
 
 	storage.Lock()
-	defer storage.Unlock()
-	storage.logsReceived += logsReceived
+
 	storage.payloadsReceived++
+	storage.logsReceived += len(newLogs)
+	storage.logs = append(storage.logs, newLogs...)
+
+	storage.Unlock()
+
+	Send(NewLogsEvent{NewLogs: newLogs})
 }
 
 func consumeTraces(p []*traces.ResourceSpans) {
@@ -116,6 +117,8 @@ func consumeMetrics(p []*metrics.ResourceMetrics) {
 	storage.payloadsReceived++
 }
 
+type ServerEvent interface{ secret() }
+
 type ConsumeEvent struct {
 	Payloads int
 	Logs     int
@@ -123,12 +126,19 @@ type ConsumeEvent struct {
 	Metrics  int
 }
 
-func QueryLogs(n int) []*Log {
-	res := []*Log{}
-	storage.logs.Range(func(key uint64, value *Log) bool {
-		res = append(res, value)
-		n--
-		return n != 0
-	})
-	return res
+type QueriedLogsEvent struct{ Logs []*Log }
+type NewLogsEvent struct{ NewLogs []*Log }
+
+func (ConsumeEvent) secret()     {}
+func (QueriedLogsEvent) secret() {}
+func (NewLogsEvent) secret()     {}
+
+var _ ServerEvent = ConsumeEvent{}
+var _ ServerEvent = QueriedLogsEvent{}
+var _ ServerEvent = NewLogsEvent{}
+
+func QueryLogs() QueriedLogsEvent {
+	storage.RLock()
+	defer storage.RUnlock()
+	return QueriedLogsEvent{Logs: storage.logs}
 }

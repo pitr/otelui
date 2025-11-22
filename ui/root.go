@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
 	"github.com/pitr/otelui/server"
 	"github.com/pitr/otelui/ui/components"
 )
@@ -76,10 +77,10 @@ func (m model) Init() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
+	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-	case QueriedLogs:
-	case server.ConsumeEvent:
+	case server.ServerEvent:
 	default:
 		defer func(start time.Time) { slog.Debug(fmt.Sprintf("%s to process %#v", time.Since(start), msg)) }(time.Now())
 	}
@@ -108,11 +109,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.w = msg.Width
 		msg.Height -= m.topoffset
-		var cmd2 tea.Cmd
 		for k, v := range m.models {
-			m.models[k], cmd2 = v.Update(msg)
-			cmd = tea.Batch(cmd, cmd2)
+			m.models[k], cmd = v.Update(msg)
+			cmds = append(cmds, cmd)
 		}
+		cmd = tea.Batch(cmds...)
 	case tea.MouseMsg:
 		if msg.Y >= m.topoffset {
 			msg.Y -= m.topoffset
@@ -129,6 +130,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		default:
 			m.models[m.mode], cmd = m.models[m.mode].Update(msg)
 		}
+	case server.ServerEvent:
+		for k, v := range m.models {
+			m.models[k], cmd = v.Update(msg)
+			cmds = append(cmds, cmd)
+		}
+		cmd = tea.Batch(cmds...)
 	default:
 		m.models[m.mode], cmd = m.models[m.mode].Update(msg)
 	}

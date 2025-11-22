@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/tree"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/pitr/otelui/server"
 	"github.com/pitr/otelui/ui/components"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
@@ -21,48 +22,38 @@ type keyMapLogs struct {
 	Down key.Binding
 }
 
-type QueriedLogs []*server.Log
-
 type logsModel struct {
-	lastLogs    int
-	keyMap      keyMapLogs
-	logs        []*server.Log
-	selectedLog *server.Log
-	_selected   lipgloss.Style
-	view        components.Splitview[*components.Viewport]
+	keyMap keyMapLogs
+
+	view components.Splitview[*components.Viewport]
 }
 
 func newLogsModel() tea.Model {
-	return logsModel{
+	m := logsModel{
 		keyMap: keyMapLogs{
 			Up:   key.NewBinding(key.WithKeys("up"), key.WithHelp("↑/↓", "select")),
 			Down: key.NewBinding(key.WithKeys("down")),
 		},
-		logs:      []*server.Log{},
-		_selected: lipgloss.NewStyle().Background(components.FadedColor),
-		view: components.NewSplitview(
-			components.NewViewport(true),
-			components.NewViewport(false),
-		),
 	}
+	m.view = components.NewSplitview(
+		components.NewViewport(true, m.updateDetailsContent),
+		components.NewViewport(false, nil),
+	)
+	return m
 }
 
 func (m logsModel) Init() tea.Cmd {
-	return nil
+	return func() tea.Msg { return server.QueryLogs() }
 }
 
 func (m logsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
-	case server.ConsumeEvent:
-		if msg.Logs != m.lastLogs {
-			m.lastLogs = msg.Logs
-			return m, func() tea.Msg { return QueriedLogs(server.QueryLogs(100)) }
-		}
-	case QueriedLogs:
-		m.logs = msg
-		m.renderMain()
+	case server.NewLogsEvent:
+		m.updateMainContent(msg.NewLogs)
+	case server.QueriedLogsEvent:
+		m.updateMainContent(msg.Logs)
 	default:
 		m.view, cmd = m.view.Update(msg)
 		return m, cmd
@@ -75,7 +66,7 @@ func (m logsModel) View() string {
 }
 
 // func (m *logsModel) selectLog(l *server.Log) {
-// 	m.selectedLog = l
+// 	selectedLog = l
 // 	if l == nil {
 // 		m.mode = mLogsFocusMain
 // 	}
@@ -83,91 +74,97 @@ func (m logsModel) View() string {
 // 	m.renderDetails()
 // }
 
-func (m *logsModel) renderMain() {
+func (*logsModel) renderLog(l *server.Log) (str, yank string) {
 	var buf strings.Builder
-	for i, l := range m.logs {
-		if i > 0 {
-			buf.WriteByte('\n')
-		}
-		s := lipgloss.NewStyle()
-		switch {
-		case l.Log.SeverityNumber >= plog.SeverityNumber_SEVERITY_NUMBER_ERROR:
-			s = s.Foreground(lipgloss.Color("#FF6B6B"))
-		case l.Log.SeverityNumber >= plog.SeverityNumber_SEVERITY_NUMBER_WARN:
-			s = s.Foreground(lipgloss.Color("#FFD93D"))
-		case l.Log.SeverityNumber >= plog.SeverityNumber_SEVERITY_NUMBER_INFO:
-			s = s.Foreground(lipgloss.Color("#0f93fc"))
-		case l.Log.SeverityNumber >= plog.SeverityNumber_SEVERITY_NUMBER_DEBUG:
-			s = s.Foreground(lipgloss.Color("15"))
-		}
-		svc := "-"
-		for _, attr := range l.ResourceLogs.Resource.Attributes {
-			if attr.Key == string(semconv.ServiceNameKey) {
-				svc = AnyToString(attr.Value)
-				break
-			}
-		}
-		str := strings.Join([]string{
-			time.Unix(0, int64(l.Log.TimeUnixNano)).UTC().Format(time.RFC3339),
-			svc,
-			s.Render(lipgloss.PlaceHorizontal(3, lipgloss.Left, l.Log.SeverityText)),
-		}, " ")
-		if l == m.selectedLog {
-			buf.WriteString(m._selected.Render(str))
-			buf.WriteString(m._selected.Render(" "))
-			buf.WriteString(m._selected.Render(AnyToString(l.Log.Body)))
-		} else {
-			buf.WriteString(str)
-			buf.WriteByte(' ')
-			buf.WriteString(AnyToString(l.Log.Body))
+	s := lipgloss.NewStyle()
+	switch {
+	case l.Log.SeverityNumber >= plog.SeverityNumber_SEVERITY_NUMBER_ERROR:
+		s = s.Foreground(lipgloss.Color("#FF6B6B"))
+	case l.Log.SeverityNumber >= plog.SeverityNumber_SEVERITY_NUMBER_WARN:
+		s = s.Foreground(lipgloss.Color("#FFD93D"))
+	case l.Log.SeverityNumber >= plog.SeverityNumber_SEVERITY_NUMBER_INFO:
+		s = s.Foreground(lipgloss.Color("#0f93fc"))
+	case l.Log.SeverityNumber >= plog.SeverityNumber_SEVERITY_NUMBER_DEBUG:
+		s = s.Foreground(lipgloss.Color("15"))
+	}
+	svc := "-"
+	for _, attr := range l.ResourceLogs.Resource.Attributes {
+		if attr.Key == string(semconv.ServiceNameKey) {
+			svc = AnyToString(attr.Value)
+			break
 		}
 	}
-	m.view.Get(0).SetContent(buf.String())
+	buf.WriteString(time.Unix(0, int64(l.Log.TimeUnixNano)).UTC().Format(time.RFC3339))
+	buf.WriteByte(' ')
+	buf.WriteString(svc)
+	buf.WriteByte(' ')
+	buf.WriteString(strings.ReplaceAll(s.Render(lipgloss.PlaceHorizontal(3, lipgloss.Left, l.Log.SeverityText)), "\x1b[0m", "\x1b[39m"))
+	// if l == selectedLog {
+	// 	buf.WriteString(m._selected.Render(str))
+	// 	buf.WriteString(m._selected.Render(" "))
+	// 	buf.WriteString(m._selected.Render(AnyToString(l.Log.Body)))
+	buf.WriteByte(' ')
+	buf.WriteString(AnyToString(l.Log.Body))
+	return buf.String(), ansi.Strip(buf.String())
 }
 
-func (m *logsModel) renderDetails() {
-	if m.selectedLog == nil {
-		m.view.Get(1).SetContent("")
+func (m *logsModel) updateMainContent(logs []*server.Log) {
+	lines := []components.ViewRow{}
+	for _, l := range logs {
+		s, y := m.renderLog(l)
+		lines = append(lines, components.ViewRow{Str: s, Yank: y, Raw: l})
+	}
+	m.view.Get(0).AddContent(lines)
+}
+
+func (m *logsModel) updateDetailsContent(selected components.ViewRow) {
+	selectedLog := selected.Raw.(*server.Log)
+	if selectedLog == nil {
+		m.view.Get(1).SetContent([]components.ViewRow{})
 		return
 	}
 
 	attrs := tree.New().Root("Attributes")
-	for _, a := range m.selectedLog.Log.Attributes {
+	for _, a := range selectedLog.Log.Attributes {
 		attrs = attrs.Child(fmt.Sprintf("%s: %s", a.Key, AnyToString(a.Value)))
 	}
 	sattrs := tree.New().Root("Attributes")
-	for _, a := range m.selectedLog.ScopeLogs.Scope.Attributes {
+	for _, a := range selectedLog.ScopeLogs.Scope.Attributes {
 		sattrs = sattrs.Child(fmt.Sprintf("%s: %s", a.Key, AnyToString(a.Value)))
 	}
 	rattrs := tree.New().Root("Attributes")
-	for _, a := range m.selectedLog.ResourceLogs.Resource.Attributes {
+	for _, a := range selectedLog.ResourceLogs.Resource.Attributes {
 		rattrs = rattrs.Child(fmt.Sprintf("%s: %s", a.Key, AnyToString(a.Value)))
 	}
-	ts := time.Unix(0, int64(m.selectedLog.Log.TimeUnixNano))
-	tsobserved := time.Unix(0, int64(m.selectedLog.Log.ObservedTimeUnixNano))
+	ts := time.Unix(0, int64(selectedLog.Log.TimeUnixNano))
+	tsobserved := time.Unix(0, int64(selectedLog.Log.ObservedTimeUnixNano))
 
-	t := tree.Root("Body: " + AnyToString(m.selectedLog.Log.Body)).
+	t := tree.Root("Body: " + AnyToString(selectedLog.Log.Body)).
 		Child("Time: " + ts.Format(time.RFC3339)).
 		Child(fmt.Sprintf("Time (Observed): %s (%s)", tsobserved.Format(time.RFC3339), tsobserved.Sub(ts))).
-		Child(fmt.Sprintf("Time (Arrived): %s (%s)", m.selectedLog.Received.Format(time.RFC3339), m.selectedLog.Received.Sub(ts))).
-		Child(fmt.Sprintf("Severity: %s (%d)", m.selectedLog.Log.SeverityText, m.selectedLog.Log.SeverityNumber)).
-		Child("Event Name: " + m.selectedLog.Log.EventName).
+		Child(fmt.Sprintf("Time (Arrived): %s (%s)", selectedLog.Received.Format(time.RFC3339), selectedLog.Received.Sub(ts))).
+		Child(fmt.Sprintf("Severity: %s (%d)", selectedLog.Log.SeverityText, selectedLog.Log.SeverityNumber)).
+		Child("Event Name: " + selectedLog.Log.EventName).
 		Child(attrs).
 		Child(tree.New().Root("Scope").
-			Child("Schema URL: " + m.selectedLog.ScopeLogs.SchemaUrl).
-			Child("Scope Name: " + m.selectedLog.ScopeLogs.Scope.Name).
-			Child("Scope Version: " + m.selectedLog.ScopeLogs.Scope.Version).
+			Child("Schema URL: " + selectedLog.ScopeLogs.SchemaUrl).
+			Child("Scope Name: " + selectedLog.ScopeLogs.Scope.Name).
+			Child("Scope Version: " + selectedLog.ScopeLogs.Scope.Version).
 			Child(sattrs)).
 		Child(tree.New().Root("Resource").
-			Child("Schema URL: " + m.selectedLog.ResourceLogs.SchemaUrl).
+			Child("Schema URL: " + selectedLog.ResourceLogs.SchemaUrl).
 			Child(rattrs))
-	if len(m.selectedLog.Log.TraceId) != 0 {
-		t.Child("TraceID: " + hex.EncodeToString(m.selectedLog.Log.TraceId))
+	if len(selectedLog.Log.TraceId) != 0 {
+		t.Child("TraceID: " + hex.EncodeToString(selectedLog.Log.TraceId))
 	}
-	if len(m.selectedLog.Log.SpanId) != 0 {
-		t.Child("SpanID: " + hex.EncodeToString(m.selectedLog.Log.SpanId))
+	if len(selectedLog.Log.SpanId) != 0 {
+		t.Child("SpanID: " + hex.EncodeToString(selectedLog.Log.SpanId))
 	}
-	m.view.Get(1).SetContent(t.String())
+	lines := []components.ViewRow{}
+	for l := range strings.SplitSeq(t.String(), "\n") {
+		lines = append(lines, components.ViewRow{Str: l, Yank: l, Raw: l})
+	}
+	m.view.Get(1).SetContent(lines)
 }
 
 func (m logsModel) Help() []key.Binding {
