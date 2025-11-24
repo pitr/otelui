@@ -28,22 +28,22 @@ var Storage struct {
 	spansReceived   int
 	metricsReceived int
 
-	Payloads []*Payload
-	Logs     []*Log
+	payloads []*Payload
+	logs     []*Log
 }
 
 var Send func(msg any)
 
 func init() {
-	Storage.Logs = []*Log{}
-	Storage.Payloads = []*Payload{}
+	Storage.logs = []*Log{}
+	Storage.payloads = []*Payload{}
 
 	go func() {
 		for range time.Tick(time.Second) {
 			Storage.RLock()
 			e := ConsumeEvent{
-				Payloads: len(Storage.Payloads),
-				Logs:     len(Storage.Logs),
+				Payloads: len(Storage.payloads),
+				Logs:     len(Storage.logs),
 				Spans:    Storage.spansReceived,
 				Metrics:  Storage.metricsReceived,
 			}
@@ -77,8 +77,8 @@ func consumeLogs(p []*logs.ResourceLogs) {
 	Storage.Lock()
 	defer Storage.Unlock()
 
-	Storage.Payloads = append(Storage.Payloads, &Payload{Received: now, Num: len(newLogs), Payload: p})
-	Storage.Logs = append(Storage.Logs, newLogs...)
+	Storage.payloads = append(Storage.payloads, &Payload{Received: now, Num: len(newLogs), Payload: p})
+	Storage.logs = append(Storage.logs, newLogs...)
 
 }
 
@@ -99,7 +99,7 @@ func consumeTraces(p []*traces.ResourceSpans) {
 	Storage.Lock()
 	defer Storage.Unlock()
 
-	Storage.Payloads = append(Storage.Payloads, &Payload{Received: now, Num: spansReceived, Payload: p})
+	Storage.payloads = append(Storage.payloads, &Payload{Received: now, Num: spansReceived, Payload: p})
 	Storage.spansReceived += spansReceived
 }
 
@@ -120,8 +120,19 @@ func consumeMetrics(p []*metrics.ResourceMetrics) {
 	Storage.Lock()
 	defer Storage.Unlock()
 
-	Storage.Payloads = append(Storage.Payloads, &Payload{Received: now, Num: metricsReceived, Payload: p})
+	Storage.payloads = append(Storage.payloads, &Payload{Received: now, Num: metricsReceived, Payload: p})
 	Storage.metricsReceived += metricsReceived
+}
+
+func GetPayloads() []*Payload {
+	Storage.RLock()
+	defer Storage.RUnlock()
+	return Storage.payloads
+}
+func GetLogs() []*Log {
+	Storage.RLock()
+	defer Storage.RUnlock()
+	return Storage.logs
 }
 
 type ConsumeEvent struct {

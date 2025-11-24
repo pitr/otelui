@@ -57,7 +57,7 @@ func (m payloadsModel) View() string {
 
 func (m *payloadsModel) updateMainContent() {
 	payloads := []components.ViewRow{}
-	for _, p := range server.Storage.Payloads {
+	for _, p := range server.GetPayloads() {
 		t := "unknown"
 		switch p.Payload.(type) {
 		case []*logs.ResourceLogs:

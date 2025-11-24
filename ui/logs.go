@@ -60,7 +60,7 @@ func (m *logsModel) updateMainContent() {
 	var buf strings.Builder
 
 	lines := []components.ViewRow{}
-	for _, l := range server.Storage.Logs {
+	for _, l := range server.GetLogs() {
 		s := lipgloss.NewStyle()
 		switch {
 		case l.Log.SeverityNumber >= logs.SeverityNumber_SEVERITY_NUMBER_ERROR:
@@ -91,7 +91,7 @@ func (m *logsModel) updateMainContent() {
 		lines = append(lines, components.ViewRow{Str: str, Yank: ansi.Strip(str), Raw: l})
 		buf.Reset()
 	}
-	m.view.Get(0).AddContent(lines)
+	m.view.Get(0).SetContent(lines)
 }
 
 func (m *logsModel) updateDetailsContent(selected components.ViewRow) {
