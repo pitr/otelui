@@ -80,9 +80,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-	case server.ServerEvent:
 	default:
-		defer func(start time.Time) { slog.Debug(fmt.Sprintf("%s to process %#v", time.Since(start), msg)) }(time.Now())
+		defer func(start time.Time) {
+			slog.Debug(fmt.Sprintf("Update(%T) %s - %#v", msg, time.Since(start), msg))
+		}(time.Now())
 	}
 
 	switch msg := msg.(type) {
@@ -105,7 +106,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.status = fmt.Sprintf("payloads=%s logs=%s spans=%s metrics=%s", payloadsStyle.Render(strconv.Itoa(msg.Payloads)), logsStyle.Render(strconv.Itoa(msg.Logs)), spansStyle.Render(strconv.Itoa(msg.Spans)), metricsStyle.Render(strconv.Itoa(msg.Metrics)))
 		m.ce = msg
-		m.models[m.mode], cmd = m.models[m.mode].Update(msg)
+		for k, v := range m.models {
+			m.models[k], cmd = v.Update(msg)
+			cmds = append(cmds, cmd)
+		}
+		cmd = tea.Batch(cmds...)
 	case tea.WindowSizeMsg:
 		m.w = msg.Width
 		msg.Height -= m.topoffset
@@ -130,12 +135,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		default:
 			m.models[m.mode], cmd = m.models[m.mode].Update(msg)
 		}
-	case server.ServerEvent:
-		for k, v := range m.models {
-			m.models[k], cmd = v.Update(msg)
-			cmds = append(cmds, cmd)
-		}
-		cmd = tea.Batch(cmds...)
 	default:
 		m.models[m.mode], cmd = m.models[m.mode].Update(msg)
 	}

@@ -29,13 +29,13 @@ var Storage struct {
 	metricsReceived int
 
 	Payloads []*Payload
-	logs     []*Log
+	Logs     []*Log
 }
 
 var Send func(msg any)
 
 func init() {
-	Storage.logs = []*Log{}
+	Storage.Logs = []*Log{}
 	Storage.Payloads = []*Payload{}
 
 	go func() {
@@ -43,7 +43,7 @@ func init() {
 			Storage.RLock()
 			e := ConsumeEvent{
 				Payloads: len(Storage.Payloads),
-				Logs:     len(Storage.logs),
+				Logs:     len(Storage.Logs),
 				Spans:    Storage.spansReceived,
 				Metrics:  Storage.metricsReceived,
 			}
@@ -75,13 +75,11 @@ func consumeLogs(p []*logs.ResourceLogs) {
 	}
 
 	Storage.Lock()
+	defer Storage.Unlock()
 
 	Storage.Payloads = append(Storage.Payloads, &Payload{Received: now, Num: len(newLogs), Payload: p})
-	Storage.logs = append(Storage.logs, newLogs...)
+	Storage.Logs = append(Storage.Logs, newLogs...)
 
-	Storage.Unlock()
-
-	Send(NewLogsEvent{NewLogs: newLogs})
 }
 
 func consumeTraces(p []*traces.ResourceSpans) {
@@ -100,6 +98,7 @@ func consumeTraces(p []*traces.ResourceSpans) {
 
 	Storage.Lock()
 	defer Storage.Unlock()
+
 	Storage.Payloads = append(Storage.Payloads, &Payload{Received: now, Num: spansReceived, Payload: p})
 	Storage.spansReceived += spansReceived
 }
@@ -120,32 +119,14 @@ func consumeMetrics(p []*metrics.ResourceMetrics) {
 
 	Storage.Lock()
 	defer Storage.Unlock()
+
 	Storage.Payloads = append(Storage.Payloads, &Payload{Received: now, Num: metricsReceived, Payload: p})
 	Storage.metricsReceived += metricsReceived
 }
-
-type ServerEvent interface{ secret() }
 
 type ConsumeEvent struct {
 	Payloads int
 	Logs     int
 	Spans    int
 	Metrics  int
-}
-
-type QueriedLogsEvent struct{ Logs []*Log }
-type NewLogsEvent struct{ NewLogs []*Log }
-
-func (ConsumeEvent) secret()     {}
-func (QueriedLogsEvent) secret() {}
-func (NewLogsEvent) secret()     {}
-
-var _ ServerEvent = ConsumeEvent{}
-var _ ServerEvent = QueriedLogsEvent{}
-var _ ServerEvent = NewLogsEvent{}
-
-func QueryLogs() QueriedLogsEvent {
-	Storage.RLock()
-	defer Storage.RUnlock()
-	return QueriedLogsEvent{Logs: Storage.logs}
 }

@@ -11,14 +11,16 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/tree"
 	"github.com/charmbracelet/x/ansi"
+	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
+	logs "go.opentelemetry.io/proto/otlp/logs/v1"
+
 	"github.com/pitr/otelui/server"
 	"github.com/pitr/otelui/ui/components"
-	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
-	plog "go.opentelemetry.io/proto/otlp/logs/v1"
 )
 
 type logsModel struct {
-	view components.Splitview[*components.Viewport]
+	view     components.Splitview[*components.Viewport]
+	lastLogs int
 }
 
 func newLogsModel() tea.Model {
@@ -31,17 +33,18 @@ func newLogsModel() tea.Model {
 }
 
 func (m logsModel) Init() tea.Cmd {
-	return func() tea.Msg { return server.QueryLogs() }
+	return nil
 }
 
 func (m logsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
-	case server.NewLogsEvent:
-		m.updateMainContent(msg.NewLogs)
-	case server.QueriedLogsEvent:
-		m.updateMainContent(msg.Logs)
+	case server.ConsumeEvent:
+		if m.lastLogs != msg.Logs {
+			m.lastLogs = msg.Logs
+			m.updateMainContent()
+		}
 	default:
 		m.view, cmd = m.view.Update(msg)
 		return m, cmd
@@ -53,41 +56,40 @@ func (m logsModel) View() string {
 	return m.view.View()
 }
 
-func (*logsModel) renderLog(l *server.Log) (str, yank string) {
+func (m *logsModel) updateMainContent() {
 	var buf strings.Builder
-	s := lipgloss.NewStyle()
-	switch {
-	case l.Log.SeverityNumber >= plog.SeverityNumber_SEVERITY_NUMBER_ERROR:
-		s = s.Foreground(lipgloss.Color("#FF6B6B"))
-	case l.Log.SeverityNumber >= plog.SeverityNumber_SEVERITY_NUMBER_WARN:
-		s = s.Foreground(lipgloss.Color("#FFD93D"))
-	case l.Log.SeverityNumber >= plog.SeverityNumber_SEVERITY_NUMBER_INFO:
-		s = s.Foreground(lipgloss.Color("#0f93fc"))
-	case l.Log.SeverityNumber >= plog.SeverityNumber_SEVERITY_NUMBER_DEBUG:
-		s = s.Foreground(lipgloss.Color("15"))
-	}
-	svc := "-"
-	for _, attr := range l.ResourceLogs.Resource.Attributes {
-		if attr.Key == string(semconv.ServiceNameKey) {
-			svc = AnyToString(attr.Value)
-			break
-		}
-	}
-	buf.WriteString(nanoToString(l.Log.TimeUnixNano))
-	buf.WriteByte(' ')
-	buf.WriteString(svc)
-	buf.WriteByte(' ')
-	buf.WriteString(strings.ReplaceAll(s.Render(lipgloss.PlaceHorizontal(3, lipgloss.Left, l.Log.SeverityText)), "\x1b[0m", "\x1b[39m"))
-	buf.WriteByte(' ')
-	buf.WriteString(AnyToString(l.Log.Body))
-	return buf.String(), ansi.Strip(buf.String())
-}
 
-func (m *logsModel) updateMainContent(logs []*server.Log) {
 	lines := []components.ViewRow{}
-	for _, l := range logs {
-		s, y := m.renderLog(l)
-		lines = append(lines, components.ViewRow{Str: s, Yank: y, Raw: l})
+	for _, l := range server.Storage.Logs {
+		s := lipgloss.NewStyle()
+		switch {
+		case l.Log.SeverityNumber >= logs.SeverityNumber_SEVERITY_NUMBER_ERROR:
+			s = s.Foreground(lipgloss.Color("#FF6B6B"))
+		case l.Log.SeverityNumber >= logs.SeverityNumber_SEVERITY_NUMBER_WARN:
+			s = s.Foreground(lipgloss.Color("#FFD93D"))
+		case l.Log.SeverityNumber >= logs.SeverityNumber_SEVERITY_NUMBER_INFO:
+			s = s.Foreground(lipgloss.Color("#0f93fc"))
+		case l.Log.SeverityNumber >= logs.SeverityNumber_SEVERITY_NUMBER_DEBUG:
+			s = s.Foreground(lipgloss.Color("15"))
+		}
+		svc := "-"
+		for _, attr := range l.ResourceLogs.Resource.Attributes {
+			if attr.Key == string(semconv.ServiceNameKey) {
+				svc = AnyToString(attr.Value)
+				break
+			}
+		}
+		buf.WriteString(nanoToString(l.Log.TimeUnixNano))
+		buf.WriteByte(' ')
+		buf.WriteString(svc)
+		buf.WriteByte(' ')
+		// only reset foreground (so row select works correctly)
+		buf.WriteString(strings.ReplaceAll(s.Render(lipgloss.PlaceHorizontal(3, lipgloss.Left, l.Log.SeverityText)), "\x1b[0m", "\x1b[39m"))
+		buf.WriteByte(' ')
+		buf.WriteString(AnyToString(l.Log.Body))
+		str := buf.String()
+		lines = append(lines, components.ViewRow{Str: str, Yank: ansi.Strip(str), Raw: l})
+		buf.Reset()
 	}
 	m.view.Get(0).AddContent(lines)
 }
