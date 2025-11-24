@@ -23,6 +23,8 @@ const (
 	mRootTraces
 	mRootMetrics
 	mRootPayloads
+
+	mRootTopOffset = 1
 )
 
 type keyMapRoot struct {
@@ -37,9 +39,7 @@ type model struct {
 
 	mode      mRoot
 	w         int
-	topoffset int
 	models    map[mRoot]tea.Model
-	menus     []string
 	_selected lipgloss.Style
 	ce        server.ConsumeEvent
 	status    string
@@ -52,19 +52,12 @@ func newRootModel() tea.Model {
 			Prev: key.NewBinding(key.WithKeys("[")),
 			Quit: key.NewBinding(key.WithKeys("ctrl+c", "q")),
 		},
-		help:      help.New(),
-		topoffset: 2,
+		help: help.New(),
 		models: map[mRoot]tea.Model{
 			mRootLogs:     newLogsModel(),
 			mRootTraces:   newTracesModel(),
 			mRootMetrics:  newMetricsModel(),
 			mRootPayloads: newPayloadsModel(),
-		},
-		menus: []string{
-			"   Logs   ",
-			"  Traces  ",
-			" Metrics ",
-			" Payloads ",
 		},
 		status:    "waiting for data...",
 		_selected: lipgloss.NewStyle().Background(components.FadedColor).Bold(true),
@@ -113,15 +106,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmd = tea.Batch(cmds...)
 	case tea.WindowSizeMsg:
 		m.w = msg.Width
-		msg.Height -= m.topoffset
+		msg.Height -= mRootTopOffset
 		for k, v := range m.models {
 			m.models[k], cmd = v.Update(msg)
 			cmds = append(cmds, cmd)
 		}
 		cmd = tea.Batch(cmds...)
 	case tea.MouseMsg:
-		if msg.Y >= m.topoffset {
-			msg.Y -= m.topoffset
+		if msg.Y >= mRootTopOffset {
+			msg.Y -= mRootTopOffset
 			m.models[m.mode], cmd = m.models[m.mode].Update(msg)
 		}
 	case tea.KeyMsg:
@@ -156,16 +149,5 @@ func (m model) View() string {
 	gap := strings.Repeat(" ", max(0, m.w-lipgloss.Width(help+m.status)))
 	header := m.status + gap + help
 
-	menu := ""
-	for i, mode := range m.menus {
-		if m.mode == mRoot(i) {
-			menu += m._selected.Render(mode)
-		} else {
-			menu += mode
-		}
-	}
-	menu = lipgloss.PlaceHorizontal(m.w, lipgloss.Center, menu)
-	view := m.models[m.mode].View()
-
-	return lipgloss.JoinVertical(lipgloss.Left, header, menu, view)
+	return header + "\n" + m.models[m.mode].View()
 }

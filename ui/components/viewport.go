@@ -28,6 +28,7 @@ type keysViewport struct {
 
 type Viewport struct {
 	isFocused bool
+	title     string
 
 	onSelect func(ViewRow)
 
@@ -45,8 +46,9 @@ type Viewport struct {
 	longestLineWidth int
 }
 
-func NewViewport(onselect func(ViewRow)) *Viewport {
+func NewViewport(title string, onselect func(ViewRow)) *Viewport {
 	return &Viewport{
+		title:    title,
 		onSelect: onselect,
 		keyMap: keysViewport{
 			Yank:   key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "copy")),
@@ -134,31 +136,36 @@ func (v *Viewport) View() string {
 	}
 	s = s.Border(v._border, true, false, false, true)
 	lines := v.visibleLines()
-	return lipgloss.JoinHorizontal(
-		lipgloss.Top,
-		lipgloss.JoinVertical(
-			lipgloss.Left,
-			s.Render(lipgloss.NewStyle().
-				Width(v.w).MaxWidth(v.w).
-				Height(v.h).MaxHeight(v.h).
-				Render(strings.Join(lines, "\n"))),
+	return strings.Replace(
+		lipgloss.JoinHorizontal(
+			lipgloss.Top,
+			lipgloss.JoinVertical(
+				lipgloss.Left,
+				s.Render(lipgloss.NewStyle().
+					Width(v.w).MaxWidth(v.w).
+					Height(v.h).MaxHeight(v.h).
+					Render(strings.Join(lines, "\n"))),
+				Scrollbar(
+					s,
+					ScrollbarHorizontal,
+					v.w,
+					v.longestLineWidth,
+					v.w,
+					v.xOffset,
+				),
+			),
 			Scrollbar(
 				s,
-				ScrollbarHorizontal,
-				v.w,
-				v.longestLineWidth,
-				v.w,
-				v.xOffset,
+				ScrollbarVertical,
+				v.h,
+				len(v.lines),
+				len(lines),
+				v.selected,
 			),
 		),
-		Scrollbar(
-			s,
-			ScrollbarVertical,
-			v.h,
-			len(v.lines),
-			len(lines),
-			v.selected,
-		),
+		strings.Repeat(v._border.Top, lipgloss.Width(v.title)+3),
+		v._border.Top+" "+v.title+" ",
+		1,
 	)
 }
 

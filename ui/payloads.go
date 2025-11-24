@@ -26,8 +26,8 @@ type payloadsModel struct {
 func newPayloadsModel() tea.Model {
 	m := payloadsModel{}
 	m.view = components.NewSplitview(
-		components.NewViewport(m.updateDetailsContent),
-		components.NewViewport(nil),
+		components.NewViewport("Payloads", m.updateDetailsContent),
+		components.NewViewport("Details", nil),
 	)
 	return m
 }
