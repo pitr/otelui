@@ -53,15 +53,6 @@ func (m logsModel) View() string {
 	return m.view.View()
 }
 
-// func (m *logsModel) selectLog(l *server.Log) {
-// 	selectedLog = l
-// 	if l == nil {
-// 		m.mode = mLogsFocusMain
-// 	}
-// 	m.renderMain()
-// 	m.renderDetails()
-// }
-
 func (*logsModel) renderLog(l *server.Log) (str, yank string) {
 	var buf strings.Builder
 	s := lipgloss.NewStyle()
@@ -82,15 +73,11 @@ func (*logsModel) renderLog(l *server.Log) (str, yank string) {
 			break
 		}
 	}
-	buf.WriteString(time.Unix(0, int64(l.Log.TimeUnixNano)).UTC().Format(time.RFC3339))
+	buf.WriteString(nanoToString(l.Log.TimeUnixNano))
 	buf.WriteByte(' ')
 	buf.WriteString(svc)
 	buf.WriteByte(' ')
 	buf.WriteString(strings.ReplaceAll(s.Render(lipgloss.PlaceHorizontal(3, lipgloss.Left, l.Log.SeverityText)), "\x1b[0m", "\x1b[39m"))
-	// if l == selectedLog {
-	// 	buf.WriteString(m._selected.Render(str))
-	// 	buf.WriteString(m._selected.Render(" "))
-	// 	buf.WriteString(m._selected.Render(AnyToString(l.Log.Body)))
 	buf.WriteByte(' ')
 	buf.WriteString(AnyToString(l.Log.Body))
 	return buf.String(), ansi.Strip(buf.String())
@@ -112,34 +99,25 @@ func (m *logsModel) updateDetailsContent(selected components.ViewRow) {
 		return
 	}
 
-	attrs := tree.New().Root("Attributes")
-	for _, a := range selectedLog.Log.Attributes {
-		attrs = attrs.Child(fmt.Sprintf("%s: %s", a.Key, AnyToString(a.Value)))
-	}
-	sattrs := tree.New().Root("Attributes")
-	for _, a := range selectedLog.ScopeLogs.Scope.Attributes {
-		sattrs = sattrs.Child(fmt.Sprintf("%s: %s", a.Key, AnyToString(a.Value)))
-	}
-	rattrs := tree.New().Root("Attributes")
-	for _, a := range selectedLog.ResourceLogs.Resource.Attributes {
-		rattrs = rattrs.Child(fmt.Sprintf("%s: %s", a.Key, AnyToString(a.Value)))
-	}
-	ts := time.Unix(0, int64(selectedLog.Log.TimeUnixNano))
-	tsobserved := time.Unix(0, int64(selectedLog.Log.ObservedTimeUnixNano))
+	attrs := attrsToTree("Attributes", selectedLog.Log.Attributes)
+	sattrs := attrsToTree("Attributes", selectedLog.ScopeLogs.Scope.Attributes)
+	rattrs := attrsToTree("Attributes", selectedLog.ResourceLogs.Resource.Attributes)
+	ts := nanoToString(selectedLog.Log.TimeUnixNano)
+	tsobserved := nanoToString(selectedLog.Log.ObservedTimeUnixNano)
 
 	t := tree.Root("Body: " + AnyToString(selectedLog.Log.Body)).
-		Child("Time: " + ts.Format(time.RFC3339)).
-		Child(fmt.Sprintf("Time (Observed): %s (%s)", tsobserved.Format(time.RFC3339), tsobserved.Sub(ts))).
-		Child(fmt.Sprintf("Time (Arrived): %s (%s)", selectedLog.Received.Format(time.RFC3339), selectedLog.Received.Sub(ts))).
+		Child("Time: " + ts).
+		Child(fmt.Sprintf("Time (Observed): %s (%s)", tsobserved, time.Duration(selectedLog.Log.ObservedTimeUnixNano-selectedLog.Log.TimeUnixNano))).
+		Child(fmt.Sprintf("Time (Arrived): %s (%s)", nanoToString(uint64(selectedLog.Received.UnixNano())), selectedLog.Received.Add(time.Duration(selectedLog.Log.TimeUnixNano)))).
 		Child(fmt.Sprintf("Severity: %s (%d)", selectedLog.Log.SeverityText, selectedLog.Log.SeverityNumber)).
 		Child("Event Name: " + selectedLog.Log.EventName).
 		Child(attrs).
-		Child(tree.New().Root("Scope").
+		Child(tree.Root("Scope").
 			Child("Schema URL: " + selectedLog.ScopeLogs.SchemaUrl).
 			Child("Scope Name: " + selectedLog.ScopeLogs.Scope.Name).
 			Child("Scope Version: " + selectedLog.ScopeLogs.Scope.Version).
 			Child(sattrs)).
-		Child(tree.New().Root("Resource").
+		Child(tree.Root("Resource").
 			Child("Schema URL: " + selectedLog.ResourceLogs.SchemaUrl).
 			Child(rattrs))
 	if len(selectedLog.Log.TraceId) != 0 {
@@ -150,7 +128,7 @@ func (m *logsModel) updateDetailsContent(selected components.ViewRow) {
 	}
 	lines := []components.ViewRow{}
 	for l := range strings.SplitSeq(t.String(), "\n") {
-		lines = append(lines, components.ViewRow{Str: l, Yank: l, Raw: l})
+		lines = append(lines, components.ViewRow{Str: l, Yank: treeTrim(l)})
 	}
 	m.view.Get(1).SetContent(lines)
 }
