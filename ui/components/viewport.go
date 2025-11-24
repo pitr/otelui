@@ -50,6 +50,7 @@ func NewViewport(title string, onselect func(ViewRow)) *Viewport {
 	return &Viewport{
 		title:    title,
 		onSelect: onselect,
+		selected: -1,
 		keyMap: keysViewport{
 			Yank:   key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "copy")),
 			Pgup:   key.NewBinding(key.WithKeys("pgup")),
@@ -172,6 +173,7 @@ func (v *Viewport) View() string {
 func (v *Viewport) SetContent(lines []ViewRow) {
 	v.lines = lines
 	v.longestLineWidth = v.findLongestLineWidth(lines)
+	v.xOffset = 0
 
 	if v.selected >= len(v.lines) {
 		v.scrollTo(len(v.lines) - 1)
@@ -195,7 +197,11 @@ func (v *Viewport) SetFocus(b bool) {
 }
 
 func (v *Viewport) scrollTo(i int) {
-	v.selected = max(0, min(i, len(v.lines)-1))
+	i = max(0, min(i, len(v.lines)-1))
+	if v.selected == i {
+		return
+	}
+	v.selected = i
 	if len(v.lines) > 0 && v.onSelect != nil {
 		v.onSelect(v.lines[v.selected])
 	}
