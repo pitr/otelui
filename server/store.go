@@ -9,6 +9,12 @@ import (
 	traces "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
+type Payload struct {
+	Received time.Time
+	Num      int
+	Payload  any
+}
+
 type Log struct {
 	Received     time.Time
 	Log          *logs.LogRecord
@@ -16,32 +22,32 @@ type Log struct {
 	ScopeLogs    *logs.ScopeLogs
 }
 
-var storage struct {
+var Storage struct {
 	sync.RWMutex
 
-	payloadsReceived int
-	logsReceived     int
-	spansReceived    int
-	metricsReceived  int
+	spansReceived   int
+	metricsReceived int
 
-	logs []*Log
+	Payloads []*Payload
+	logs     []*Log
 }
 
 var Send func(msg any)
 
 func init() {
-	storage.logs = []*Log{}
+	Storage.logs = []*Log{}
+	Storage.Payloads = []*Payload{}
 
 	go func() {
 		for range time.Tick(time.Second) {
-			storage.RLock()
+			Storage.RLock()
 			e := ConsumeEvent{
-				Payloads: storage.payloadsReceived,
-				Logs:     storage.logsReceived,
-				Spans:    storage.spansReceived,
-				Metrics:  storage.metricsReceived,
+				Payloads: len(Storage.Payloads),
+				Logs:     len(Storage.logs),
+				Spans:    Storage.spansReceived,
+				Metrics:  Storage.metricsReceived,
 			}
-			storage.RUnlock()
+			Storage.RUnlock()
 			Send(e)
 		}
 	}()
@@ -68,13 +74,12 @@ func consumeLogs(p []*logs.ResourceLogs) {
 		}
 	}
 
-	storage.Lock()
+	Storage.Lock()
 
-	storage.payloadsReceived++
-	storage.logsReceived += len(newLogs)
-	storage.logs = append(storage.logs, newLogs...)
+	Storage.Payloads = append(Storage.Payloads, &Payload{Received: now, Num: len(newLogs), Payload: p})
+	Storage.logs = append(Storage.logs, newLogs...)
 
-	storage.Unlock()
+	Storage.Unlock()
 
 	Send(NewLogsEvent{NewLogs: newLogs})
 }
@@ -84,6 +89,7 @@ func consumeTraces(p []*traces.ResourceSpans) {
 		return
 	}
 
+	now := time.Now().UTC()
 	spansReceived := 0
 
 	for _, rs := range p {
@@ -92,10 +98,10 @@ func consumeTraces(p []*traces.ResourceSpans) {
 		}
 	}
 
-	storage.Lock()
-	defer storage.Unlock()
-	storage.spansReceived += spansReceived
-	storage.payloadsReceived++
+	Storage.Lock()
+	defer Storage.Unlock()
+	Storage.Payloads = append(Storage.Payloads, &Payload{Received: now, Num: spansReceived, Payload: p})
+	Storage.spansReceived += spansReceived
 }
 
 func consumeMetrics(p []*metrics.ResourceMetrics) {
@@ -103,6 +109,7 @@ func consumeMetrics(p []*metrics.ResourceMetrics) {
 		return
 	}
 
+	now := time.Now().UTC()
 	metricsReceived := 0
 
 	for _, rm := range p {
@@ -111,10 +118,10 @@ func consumeMetrics(p []*metrics.ResourceMetrics) {
 		}
 	}
 
-	storage.Lock()
-	defer storage.Unlock()
-	storage.metricsReceived += metricsReceived
-	storage.payloadsReceived++
+	Storage.Lock()
+	defer Storage.Unlock()
+	Storage.Payloads = append(Storage.Payloads, &Payload{Received: now, Num: metricsReceived, Payload: p})
+	Storage.metricsReceived += metricsReceived
 }
 
 type ServerEvent interface{ secret() }
@@ -138,7 +145,7 @@ var _ ServerEvent = QueriedLogsEvent{}
 var _ ServerEvent = NewLogsEvent{}
 
 func QueryLogs() QueriedLogsEvent {
-	storage.RLock()
-	defer storage.RUnlock()
-	return QueriedLogsEvent{Logs: storage.logs}
+	Storage.RLock()
+	defer Storage.RUnlock()
+	return QueriedLogsEvent{Logs: Storage.logs}
 }
