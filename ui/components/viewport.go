@@ -45,16 +45,15 @@ type Viewport struct {
 	longestLineWidth int
 }
 
-func NewViewport(focused bool, onselect func(ViewRow)) *Viewport {
+func NewViewport(onselect func(ViewRow)) *Viewport {
 	return &Viewport{
-		isFocused: focused,
-		onSelect:  onselect,
+		onSelect: onselect,
 		keyMap: keysViewport{
 			Yank:   key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "copy")),
-			Pgdown: key.NewBinding(key.WithKeys("pgdown", " ")),
 			Pgup:   key.NewBinding(key.WithKeys("pgup")),
-			Down:   key.NewBinding(key.WithKeys("down")),
+			Pgdown: key.NewBinding(key.WithKeys("pgdown", " ")),
 			Up:     key.NewBinding(key.WithKeys("up")),
+			Down:   key.NewBinding(key.WithKeys("down")),
 			Left:   key.NewBinding(key.WithKeys("left")),
 			Right:  key.NewBinding(key.WithKeys("right")),
 		},

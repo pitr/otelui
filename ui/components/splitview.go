@@ -31,18 +31,23 @@ type keysSplitview struct {
 }
 
 type Splitview[T SplitableModel[T]] struct {
-	w, hm, hd int
+	w         int
+	h         [2]int
 	views     [2]T
 	keyMap    keysSplitview
 	_selected lipgloss.Style
 }
 
 func NewSplitview[T SplitableModel[T]](top, bottom T) Splitview[T] {
+	top.SetFocus(true)
+	bottom.SetFocus(false)
+
 	return Splitview[T]{
+		h:     [2]int{0, 0},
 		views: [2]T{top, bottom},
 		keyMap: keysSplitview{
-			Increase: key.NewBinding(key.WithKeys("+"), key.WithHelp("+/_", "resize")),
-			Decrease: key.NewBinding(key.WithKeys("_")),
+			Increase: key.NewBinding(key.WithKeys("="), key.WithHelp("-/=", "resize")),
+			Decrease: key.NewBinding(key.WithKeys("-")),
 			Next:     key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "switch pane")),
 			Prev:     key.NewBinding(key.WithKeys("shift+tab")),
 		},
@@ -59,30 +64,38 @@ func (m Splitview[T]) Update(msg tea.Msg) (Splitview[T], tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w = msg.Width
-		m.hm = msg.Height / 2
-		m.hd = msg.Height - m.hm
+		m.h[0] = msg.Height / 2
+		m.h[1] = msg.Height - m.h[0]
 		cmd = tea.Batch(
-			m.views[0].Update(tea.WindowSizeMsg{Width: m.w, Height: m.hm}),
-			m.views[1].Update(tea.WindowSizeMsg{Width: m.w, Height: m.hd}),
+			m.views[0].Update(tea.WindowSizeMsg{Width: m.w, Height: m.h[0]}),
+			m.views[1].Update(tea.WindowSizeMsg{Width: m.w, Height: m.h[1]}),
 		)
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keyMap.Increase):
-			if m.hd >= minSplit+splitStep {
-				m.hd -= splitStep
-				m.hm += splitStep
+			i := 0
+			if m.views[1].IsFocused() {
+				i = 1
+			}
+			if m.h[1-i] >= minSplit+splitStep {
+				m.h[1-i] -= splitStep
+				m.h[i] += splitStep
 				cmd = tea.Batch(
-					m.views[0].Update(tea.WindowSizeMsg{Width: m.w, Height: m.hm}),
-					m.views[1].Update(tea.WindowSizeMsg{Width: m.w, Height: m.hd}),
+					m.views[0].Update(tea.WindowSizeMsg{Width: m.w, Height: m.h[0]}),
+					m.views[1].Update(tea.WindowSizeMsg{Width: m.w, Height: m.h[1]}),
 				)
 			}
 		case key.Matches(msg, m.keyMap.Decrease):
-			if m.hm >= minSplit+splitStep {
-				m.hd += splitStep
-				m.hm -= splitStep
+			i := 0
+			if m.views[1].IsFocused() {
+				i = 1
+			}
+			if m.h[i] >= minSplit+splitStep {
+				m.h[i] -= splitStep
+				m.h[1-i] += splitStep
 				cmd = tea.Batch(
-					m.views[0].Update(tea.WindowSizeMsg{Width: m.w, Height: m.hm}),
-					m.views[1].Update(tea.WindowSizeMsg{Width: m.w, Height: m.hd}),
+					m.views[0].Update(tea.WindowSizeMsg{Width: m.w, Height: m.h[0]}),
+					m.views[1].Update(tea.WindowSizeMsg{Width: m.w, Height: m.h[1]}),
 				)
 			}
 		case key.Matches(msg, m.keyMap.Next, m.keyMap.Prev):
@@ -101,15 +114,15 @@ func (m Splitview[T]) Update(msg tea.Msg) (Splitview[T], tea.Cmd) {
 		view := 0
 		inside := false
 		switch {
-		case msg.Y > 0 && msg.Y < m.hm-splitBorderSize:
+		case msg.Y > 0 && msg.Y < m.h[0]-splitBorderSize:
 			inside = true
 			view = 0
 			msg.Y -= splitBorderSize
-		case msg.Y > m.hm && msg.Y < m.hm+m.hd-splitBorderSize:
+		case msg.Y > m.h[0] && msg.Y < m.h[0]+m.h[1]-splitBorderSize:
 			inside = true
-			msg.Y -= m.hm + splitBorderSize
+			msg.Y -= m.h[0] + splitBorderSize
 			fallthrough
-		case msg.Y == m.hm || msg.Y == m.hm+m.hd-splitBorderSize:
+		case msg.Y == m.h[0] || msg.Y == m.h[0]+m.h[1]-splitBorderSize:
 			view = 1
 		}
 

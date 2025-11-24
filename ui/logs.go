@@ -17,27 +17,15 @@ import (
 	plog "go.opentelemetry.io/proto/otlp/logs/v1"
 )
 
-type keyMapLogs struct {
-	Up   key.Binding
-	Down key.Binding
-}
-
 type logsModel struct {
-	keyMap keyMapLogs
-
 	view components.Splitview[*components.Viewport]
 }
 
 func newLogsModel() tea.Model {
-	m := logsModel{
-		keyMap: keyMapLogs{
-			Up:   key.NewBinding(key.WithKeys("up"), key.WithHelp("↑/↓", "select")),
-			Down: key.NewBinding(key.WithKeys("down")),
-		},
-	}
+	m := logsModel{}
 	m.view = components.NewSplitview(
-		components.NewViewport(true, m.updateDetailsContent),
-		components.NewViewport(false, nil),
+		components.NewViewport(m.updateDetailsContent),
+		components.NewViewport(nil),
 	)
 	return m
 }
@@ -168,5 +156,5 @@ func (m *logsModel) updateDetailsContent(selected components.ViewRow) {
 }
 
 func (m logsModel) Help() []key.Binding {
-	return append(m.view.Help(), m.keyMap.Up)
+	return m.view.Help()
 }
