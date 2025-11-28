@@ -15,6 +15,7 @@ import (
 
 	"github.com/pitr/otelui/server"
 	"github.com/pitr/otelui/ui/components"
+	"github.com/pitr/otelui/utils"
 )
 
 type payloadsModel struct {
@@ -84,13 +85,14 @@ func (m *payloadsModel) updateDetailsContent(selected components.ViewRow) {
 			for _, sl := range rl.ScopeLogs {
 				t3 := tree.Root(fmt.Sprintf("LogRecords (%d)", len(sl.LogRecords)))
 				for _, lr := range sl.LogRecords {
+					attrs, _ := attrsToTree("Attributes", lr.Attributes)
 					t3 = t3.Child(tree.Root("LogRecord").
 						Child(fmt.Sprintf("TimeUnixNano: %s (raw=%d)", nanoToString(lr.TimeUnixNano), lr.TimeUnixNano)).
 						Child(fmt.Sprintf("ObservedTimeUnixNano: %s (raw=%d)", nanoToString(lr.ObservedTimeUnixNano), lr.ObservedTimeUnixNano)).
-						Child("Body: " + AnyToString(lr.Body)).
+						Child("Body: " + utils.AnyToString(lr.Body)).
 						Child(fmt.Sprintf("SeverityNumber: %s (raw=%d)", lr.SeverityNumber.String(), lr.SeverityNumber)).
 						Child("SeverityText: " + lr.SeverityText).
-						Child(attrsToTree("Attributes", lr.Attributes)).
+						Child(attrs).
 						Child(fmt.Sprintf("DroppedAttributesCount: %d", lr.DroppedAttributesCount)).
 						Child(fmt.Sprintf("Flags: %d", lr.Flags)).
 						Child("TraceId: " + hex.EncodeToString(lr.TraceId)).
@@ -102,9 +104,10 @@ func (m *payloadsModel) updateDetailsContent(selected components.ViewRow) {
 					Child(scopeToTree(sl.Scope)).
 					Child(t3))
 			}
+			rattrs, _ := attrsToTree("Attributes", rl.Resource.Attributes)
 			t = t.Child(tree.Root("ResourceLog").
 				Child("Schema URL: " + rl.SchemaUrl).
-				Child(attrsToTree("Attributes", rl.Resource.Attributes)).
+				Child(rattrs).
 				Child(t2))
 		}
 		for l := range strings.SplitSeq(t.String(), "\n") {
@@ -119,7 +122,7 @@ func (m *payloadsModel) updateDetailsContent(selected components.ViewRow) {
 				for _, s := range ss.Spans {
 					events := tree.Root("Events")
 					for _, e := range s.Events {
-						eattrs := attrsToTree("Attributes", e.Attributes)
+						eattrs, _ := attrsToTree("Attributes", e.Attributes)
 						events = events.Child(tree.Root("Event").
 							Child("TimeUnixNano: " + nanoToString(e.TimeUnixNano)).
 							Child("Name: " + e.Name).
@@ -128,7 +131,7 @@ func (m *payloadsModel) updateDetailsContent(selected components.ViewRow) {
 					}
 					links := tree.Root("Links")
 					for _, l := range s.Links {
-						lattrs := attrsToTree("Attributes", l.Attributes)
+						lattrs, _ := attrsToTree("Attributes", l.Attributes)
 						links = links.Child(tree.Root("Link").
 							Child("TraceId: " + hex.EncodeToString(l.TraceId)).
 							Child("SpanId: " + hex.EncodeToString(l.SpanId)).
@@ -137,6 +140,7 @@ func (m *payloadsModel) updateDetailsContent(selected components.ViewRow) {
 							Child(fmt.Sprintf("Flags: %d", l.Flags)).
 							Child(fmt.Sprintf("DroppedAttributesCount: %d", l.DroppedAttributesCount)))
 					}
+					attrs, _ := attrsToTree("Attributes", s.Attributes)
 					t3 = t3.Child(tree.Root("Span").
 						Child("TraceId: " + hex.EncodeToString(s.TraceId)).
 						Child("SpanId: " + hex.EncodeToString(s.SpanId)).
@@ -149,7 +153,7 @@ func (m *payloadsModel) updateDetailsContent(selected components.ViewRow) {
 						Child(fmt.Sprintf("Status.Code: %s (raw=%d)", s.Status.Code.String(), s.Status.Code)).
 						Child("TraceState: " + s.TraceState).
 						Child(fmt.Sprintf("Flags: %d", s.Flags)).
-						Child(attrsToTree("Attributes", s.Attributes)).
+						Child(attrs).
 						Child(events).
 						Child(links).
 						Child(fmt.Sprintf("DroppedAttributesCount: %d", s.DroppedAttributesCount)).
@@ -161,9 +165,10 @@ func (m *payloadsModel) updateDetailsContent(selected components.ViewRow) {
 					Child(scopeToTree(ss.Scope)).
 					Child(t3))
 			}
+			rattrs, _ := attrsToTree("Attributes", rs.Resource.Attributes)
 			t = t.Child(tree.Root("ResourceSpan").
 				Child("Schema URL: " + rs.SchemaUrl).
-				Child(attrsToTree("Attributes", rs.Resource.Attributes)).
+				Child(rattrs).
 				Child(t2))
 		}
 		for l := range strings.SplitSeq(t.String(), "\n") {
@@ -205,8 +210,9 @@ func (m *payloadsModel) updateDetailsContent(selected components.ViewRow) {
 							for _, qv := range dp.QuantileValues {
 								quantileValues = quantileValues.Child(fmt.Sprintf("Quantile: %f: Value: %f", qv.Quantile, qv.Value))
 							}
+							attrs, _ := attrsToTree("Attributes", dp.Attributes)
 							t4 = t4.Child(tree.Root("SummaryDataPoint").
-								Child(attrsToTree("Attributes", dp.Attributes)).
+								Child(attrs).
 								Child(fmt.Sprintf("StartTimeUnixNano: %s (raw=%d)", nanoToString(dp.StartTimeUnixNano), dp.StartTimeUnixNano)).
 								Child(fmt.Sprintf("TimeUnixNano: %s (raw=%d)", nanoToString(dp.TimeUnixNano), dp.TimeUnixNano)).
 								Child(fmt.Sprintf("Count: %d", dp.Count)).
@@ -218,8 +224,9 @@ func (m *payloadsModel) updateDetailsContent(selected components.ViewRow) {
 						t4 = tree.Root("Histogram").
 							Child(fmt.Sprintf("AggregationTemporality: %s (raw=%d)", mm.Histogram.AggregationTemporality.String(), mm.Histogram.AggregationTemporality))
 						for _, dp := range mm.Histogram.DataPoints {
+							attrs, _ := attrsToTree("Attributes", dp.Attributes)
 							t4 = t4.Child(tree.Root("HistogramDataPoint").
-								Child(attrsToTree("Attributes", dp.Attributes)).
+								Child(attrs).
 								Child(fmt.Sprintf("StartTimeUnixNano: %s (raw=%d)", nanoToString(dp.StartTimeUnixNano), dp.StartTimeUnixNano)).
 								Child(fmt.Sprintf("TimeUnixNano: %s (raw=%d)", nanoToString(dp.TimeUnixNano), dp.TimeUnixNano)).
 								Child(fmt.Sprintf("Count: %d", dp.Count)).
@@ -235,8 +242,9 @@ func (m *payloadsModel) updateDetailsContent(selected components.ViewRow) {
 						t4 = tree.Root("ExponentialHistogram").
 							Child(fmt.Sprintf("AggregationTemporality: %s (raw=%d)", mm.ExponentialHistogram.AggregationTemporality.String(), mm.ExponentialHistogram.AggregationTemporality))
 						for _, dp := range mm.ExponentialHistogram.DataPoints {
+							attrs, _ := attrsToTree("Attributes", dp.Attributes)
 							t4 = t4.Child(tree.Root("HistogramDataPoint").
-								Child(attrsToTree("Attributes", dp.Attributes)).
+								Child(attrs).
 								Child(fmt.Sprintf("StartTimeUnixNano: %s (raw=%d)", nanoToString(dp.StartTimeUnixNano), dp.StartTimeUnixNano)).
 								Child(fmt.Sprintf("TimeUnixNano: %s (raw=%d)", nanoToString(dp.TimeUnixNano), dp.TimeUnixNano)).
 								Child(fmt.Sprintf("Count: %d", dp.Count)).
@@ -253,11 +261,12 @@ func (m *payloadsModel) updateDetailsContent(selected components.ViewRow) {
 						}
 
 					}
+					mattrs, _ := attrsToTree("Metadata", m.Metadata)
 					t3 = t3.Child(tree.Root("Metric").
 						Child("Name: " + m.Name).
 						Child("Description: " + m.Description).
 						Child("Unit: " + m.Unit).
-						Child(attrsToTree("Metadata", m.Metadata)).
+						Child(mattrs).
 						Child(t4))
 				}
 				t2 = t2.Child(tree.Root("ScopeMetric").
@@ -265,9 +274,10 @@ func (m *payloadsModel) updateDetailsContent(selected components.ViewRow) {
 					Child(scopeToTree(sm.Scope)).
 					Child(t3))
 			}
+			rattrs, _ := attrsToTree("Attributes", rm.Resource.Attributes)
 			t = t.Child(tree.Root("ResourceMetric").
 				Child("Schema URL: " + rm.SchemaUrl).
-				Child(attrsToTree("Attributes", rm.Resource.Attributes)).
+				Child(rattrs).
 				Child(refs).
 				Child(t2))
 		}

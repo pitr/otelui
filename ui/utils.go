@@ -7,54 +7,10 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss/tree"
+	"github.com/pitr/otelui/utils"
 	v1 "go.opentelemetry.io/proto/otlp/common/v1"
 	metrics "go.opentelemetry.io/proto/otlp/metrics/v1"
 )
-
-func AnyToString(v *v1.AnyValue) string {
-	if v == nil {
-		return "(null)"
-	}
-	switch v := v.Value.(type) {
-	case *v1.AnyValue_StringValue:
-		return v.StringValue
-	case *v1.AnyValue_BoolValue:
-		return fmt.Sprintf("%t", v.BoolValue)
-	case *v1.AnyValue_IntValue:
-		return fmt.Sprintf("%d", v.IntValue)
-	case *v1.AnyValue_DoubleValue:
-		return fmt.Sprintf("%f", v.DoubleValue)
-	case *v1.AnyValue_ArrayValue:
-		var buf strings.Builder
-		buf.WriteByte('[')
-		for i, v := range v.ArrayValue.Values {
-			if i > 0 {
-				buf.WriteByte(',')
-			}
-			buf.WriteString(AnyToString(v))
-		}
-		buf.WriteByte(']')
-		return buf.String()
-	case *v1.AnyValue_KvlistValue:
-		var buf strings.Builder
-		buf.WriteByte('{')
-		for i, kv := range v.KvlistValue.Values {
-			if i > 0 {
-				buf.WriteByte(',')
-			}
-			buf.WriteByte('"')
-			buf.WriteString(kv.Key)
-			buf.WriteString(`":`)
-			buf.WriteString(AnyToString(kv.Value))
-		}
-		buf.WriteByte('}')
-		return buf.String()
-	case *v1.AnyValue_BytesValue:
-		return fmt.Sprintf("%x", v.BytesValue)
-	default:
-		return fmt.Sprintf("%#v", v)
-	}
-}
 
 func AnyToType(v *v1.AnyValue) string {
 	if v == nil {
@@ -89,16 +45,16 @@ func treeTrim(s string) string {
 	return strings.TrimLeft(s, " └├─│")
 }
 
-func attrsToTree(name string, kvs []*v1.KeyValue) *tree.Tree {
+func attrsToTree(name string, kvs []*v1.KeyValue) (t *tree.Tree, set bool) {
 	attrs := tree.Root(fmt.Sprintf("%s (%d):", name, len(kvs)))
 	for _, a := range kvs {
-		attrs = attrs.Child(fmt.Sprintf("%s: %s (%s)", a.Key, AnyToString(a.Value), AnyToType(a.Value)))
+		attrs = attrs.Child(fmt.Sprintf("%s: %s (%s)", a.Key, utils.AnyToString(a.Value), AnyToType(a.Value)))
 	}
-	return attrs
+	return attrs, len(kvs) > 0
 }
 
 func scopeToTree(scope *v1.InstrumentationScope) *tree.Tree {
-	sattrs := attrsToTree("Attributes", scope.Attributes)
+	sattrs, _ := attrsToTree("Attributes", scope.Attributes)
 	return tree.Root("Scope").
 		Child("Scope.Name: " + scope.Name).
 		Child("Scope.Version: " + scope.Version).
@@ -116,10 +72,11 @@ func exemplarsToTree(es []*metrics.Exemplar) *tree.Tree {
 		case *metrics.Exemplar_AsDouble:
 			value = fmt.Sprintf("%f (double)", v.AsDouble)
 		}
+		attrs, _ := attrsToTree("FilteredAttributes", e.FilteredAttributes)
 		t.Child(tree.Root("Exemplar").
 			Child(fmt.Sprintf("TimeUnixNano: %s (raw=%d)", nanoToString(e.TimeUnixNano), e.TimeUnixNano)).
 			Child("Value: " + value).
-			Child(attrsToTree("FilteredAttributes", e.FilteredAttributes)).
+			Child(attrs).
 			Child("TraceId: " + hex.EncodeToString(e.TraceId)).
 			Child("SpanId: " + hex.EncodeToString(e.SpanId)))
 	}
@@ -134,8 +91,9 @@ func numberDataPointToTree(dp *metrics.NumberDataPoint) *tree.Tree {
 	case *metrics.NumberDataPoint_AsDouble:
 		value = fmt.Sprintf("%f (double)", v.AsDouble)
 	}
+	attrs, _ := attrsToTree("Attributes", dp.Attributes)
 	return tree.Root("NumberDataPoint").
-		Child(attrsToTree("Attributes", dp.Attributes)).
+		Child(attrs).
 		Child(fmt.Sprintf("StartTimeUnixNano: %s (raw=%d)", nanoToString(dp.StartTimeUnixNano), dp.StartTimeUnixNano)).
 		Child(fmt.Sprintf("TimeUnixNano: %s (raw=%d)", nanoToString(dp.TimeUnixNano), dp.TimeUnixNano)).
 		Child("Value: " + value).

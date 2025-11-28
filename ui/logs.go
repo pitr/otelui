@@ -16,6 +16,7 @@ import (
 
 	"github.com/pitr/otelui/server"
 	"github.com/pitr/otelui/ui/components"
+	"github.com/pitr/otelui/utils"
 )
 
 type logsModel struct {
@@ -79,7 +80,7 @@ func (m *logsModel) updateMainContent() {
 		svc := "-"
 		for _, attr := range l.ResourceLogs.Resource.Attributes {
 			if attr.Key == string(semconv.ServiceNameKey) {
-				svc = AnyToString(attr.Value)
+				svc = utils.AnyToString(attr.Value)
 				break
 			}
 		}
@@ -90,7 +91,7 @@ func (m *logsModel) updateMainContent() {
 		// only reset foreground (so row select works correctly)
 		buf.WriteString(strings.ReplaceAll(s.Render(lipgloss.PlaceHorizontal(3, lipgloss.Left, l.Log.SeverityText)), "\x1b[0m", "\x1b[39m"))
 		buf.WriteByte(' ')
-		buf.WriteString(AnyToString(l.Log.Body))
+		buf.WriteString(utils.AnyToString(l.Log.Body))
 		str := buf.String()
 		lines = append(lines, components.ViewRow{Str: str, Yank: ansi.Strip(str), Raw: l})
 		buf.Reset()
@@ -105,27 +106,25 @@ func (m *logsModel) updateDetailsContent(selected components.ViewRow) {
 		return
 	}
 
-	attrs := attrsToTree("Attributes", selectedLog.Log.Attributes)
-	sattrs := attrsToTree("Attributes", selectedLog.ScopeLogs.Scope.Attributes)
-	rattrs := attrsToTree("Attributes", selectedLog.ResourceLogs.Resource.Attributes)
 	ts := nanoToString(selectedLog.Log.TimeUnixNano)
 	tsobserved := nanoToString(selectedLog.Log.ObservedTimeUnixNano)
 
-	t := tree.Root("Body: " + AnyToString(selectedLog.Log.Body)).
+	t := tree.Root("Body: " + utils.AnyToString(selectedLog.Log.Body)).
 		Child("Time: " + ts).
-		Child(fmt.Sprintf("Time (Observed): %s (%s)", tsobserved, time.Duration(selectedLog.Log.ObservedTimeUnixNano-selectedLog.Log.TimeUnixNano))).
-		Child(fmt.Sprintf("Time (Arrived): %s (%s)", nanoToString(uint64(selectedLog.Received.UnixNano())), selectedLog.Received.Add(time.Duration(selectedLog.Log.TimeUnixNano)))).
-		Child(fmt.Sprintf("Severity: %s (%d)", selectedLog.Log.SeverityText, selectedLog.Log.SeverityNumber)).
-		Child("Event Name: " + selectedLog.Log.EventName).
-		Child(attrs).
-		Child(tree.Root("Scope").
-			Child("Schema URL: " + selectedLog.ScopeLogs.SchemaUrl).
-			Child("Scope Name: " + selectedLog.ScopeLogs.Scope.Name).
-			Child("Scope Version: " + selectedLog.ScopeLogs.Scope.Version).
-			Child(sattrs)).
-		Child(tree.Root("Resource").
-			Child("Schema URL: " + selectedLog.ResourceLogs.SchemaUrl).
-			Child(rattrs))
+		Child(fmt.Sprintf("Time (Observed): %s (%s later)", tsobserved, time.Duration(selectedLog.Log.ObservedTimeUnixNano-selectedLog.Log.TimeUnixNano))).
+		Child(fmt.Sprintf("Time (Arrived): %s (%s later)", nanoToString(uint64(selectedLog.Received.UnixNano())), time.Duration(selectedLog.Received.UnixNano()-int64(selectedLog.Log.TimeUnixNano))))
+	if attrs, set := attrsToTree("Attributes", selectedLog.Log.Attributes); set {
+		t.Child(attrs)
+	}
+	if sattrs, set := attrsToTree("Attributes", selectedLog.ScopeLogs.Scope.Attributes); set {
+		t.Child(tree.Root(fmt.Sprintf("Scope for %s (%s)", selectedLog.ScopeLogs.Scope.Name, selectedLog.ScopeLogs.Scope.Version)).Child(sattrs))
+	}
+	if rattrs, set := attrsToTree("Resource Attributes", selectedLog.ResourceLogs.Resource.Attributes); set {
+		t.Child(rattrs)
+	}
+	if selectedLog.Log.EventName != "" {
+		t.Child("Event Name: " + selectedLog.Log.EventName)
+	}
 	if len(selectedLog.Log.TraceId) != 0 {
 		t.Child("TraceID: " + hex.EncodeToString(selectedLog.Log.TraceId))
 	}
