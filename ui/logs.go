@@ -56,6 +56,10 @@ func (m logsModel) View() string {
 	return m.view.View()
 }
 
+func (m logsModel) Help() []key.Binding {
+	return m.view.Help()
+}
+
 func (m *logsModel) updateMainContent() {
 	var buf strings.Builder
 
@@ -64,13 +68,13 @@ func (m *logsModel) updateMainContent() {
 		s := lipgloss.NewStyle()
 		switch {
 		case l.Log.SeverityNumber >= logs.SeverityNumber_SEVERITY_NUMBER_ERROR:
-			s = s.Foreground(lipgloss.Color("#FF6B6B"))
+			s = s.Foreground(components.ErrorColor)
 		case l.Log.SeverityNumber >= logs.SeverityNumber_SEVERITY_NUMBER_WARN:
-			s = s.Foreground(lipgloss.Color("#FFD93D"))
+			s = s.Foreground(components.WarnColor)
 		case l.Log.SeverityNumber >= logs.SeverityNumber_SEVERITY_NUMBER_INFO:
-			s = s.Foreground(lipgloss.Color("#0f93fc"))
+			s = s.Foreground(components.InfoColor)
 		case l.Log.SeverityNumber >= logs.SeverityNumber_SEVERITY_NUMBER_DEBUG:
-			s = s.Foreground(lipgloss.Color("15"))
+			s = s.Foreground(components.DebugColor)
 		}
 		svc := "-"
 		for _, attr := range l.ResourceLogs.Resource.Attributes {
@@ -133,8 +137,4 @@ func (m *logsModel) updateDetailsContent(selected components.ViewRow) {
 		lines = append(lines, components.ViewRow{Str: l, Yank: treeTrim(l)})
 	}
 	m.view.Get(1).SetContent(lines)
-}
-
-func (m logsModel) Help() []key.Binding {
-	return m.view.Help()
 }

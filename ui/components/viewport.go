@@ -61,8 +61,8 @@ func NewViewport(title string, onselect func(ViewRow)) *Viewport {
 			Right:  key.NewBinding(key.WithKeys("right")),
 		},
 		_border:    lipgloss.RoundedBorder(),
-		_focused:   lipgloss.NewStyle(),
-		_unfocused: lipgloss.NewStyle().BorderForeground(FadedColor),
+		_focused:   lipgloss.NewStyle().BorderForeground(HighlightColor),
+		_unfocused: lipgloss.NewStyle(),
 		_selected:  lipgloss.NewStyle().Background(FadedColor),
 	}
 }
