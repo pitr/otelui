@@ -1,6 +1,8 @@
 package server
 
 import (
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -78,8 +80,12 @@ func consumeLogs(p []*logs.ResourceLogs) {
 	defer Storage.Unlock()
 
 	Storage.payloads = append(Storage.payloads, &Payload{Received: now, Num: len(newLogs), Payload: p})
-	Storage.logs = append(Storage.logs, newLogs...)
-
+	for _, log := range newLogs {
+		i := sort.Search(len(Storage.logs), func(i int) bool { return Storage.logs[i].Log.TimeUnixNano > log.Log.TimeUnixNano })
+		Storage.logs = append(Storage.logs, nil)
+		copy(Storage.logs[i+1:], Storage.logs[i:])
+		Storage.logs[i] = log
+	}
 }
 
 func consumeTraces(p []*traces.ResourceSpans) {
@@ -127,12 +133,17 @@ func consumeMetrics(p []*metrics.ResourceMetrics) {
 func GetPayloads() []*Payload {
 	Storage.RLock()
 	defer Storage.RUnlock()
-	return Storage.payloads
+	res := make([]*Payload, len(Storage.payloads))
+	copy(res, Storage.payloads)
+	return res
 }
+
 func GetLogs() []*Log {
 	Storage.RLock()
 	defer Storage.RUnlock()
-	return Storage.logs
+	res := make([]*Log, len(Storage.logs))
+	copy(res, Storage.logs)
+	return res
 }
 
 type ConsumeEvent struct {
