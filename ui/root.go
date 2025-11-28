@@ -42,7 +42,7 @@ type model struct {
 	models    map[mRoot]tea.Model
 	_selected lipgloss.Style
 	ce        server.ConsumeEvent
-	status    string
+	statuses  []any
 }
 
 func newRootModel() tea.Model {
@@ -59,7 +59,6 @@ func newRootModel() tea.Model {
 			mRootMetrics:  newMetricsModel(),
 			mRootPayloads: newPayloadsModel(),
 		},
-		status:    "waiting for data...",
 		_selected: lipgloss.NewStyle().Background(components.FadedColor).Bold(true),
 	}
 }
@@ -97,7 +96,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Metrics != m.ce.Metrics {
 			metricsStyle = metricsStyle.Background(components.HighlightColor)
 		}
-		m.status = fmt.Sprintf("payloads=%s logs=%s spans=%s metrics=%s", payloadsStyle.Render(strconv.Itoa(msg.Payloads)), logsStyle.Render(strconv.Itoa(msg.Logs)), spansStyle.Render(strconv.Itoa(msg.Spans)), metricsStyle.Render(strconv.Itoa(msg.Metrics)))
+		m.statuses = []any{
+			logsStyle.Render(strconv.Itoa(msg.Logs)),
+			spansStyle.Render(strconv.Itoa(msg.Spans)),
+			metricsStyle.Render(strconv.Itoa(msg.Metrics)),
+			payloadsStyle.Render(strconv.Itoa(msg.Payloads)),
+		}
 		m.ce = msg
 		for k, v := range m.models {
 			m.models[k], cmd = v.Update(msg)
@@ -138,16 +142,30 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	defer func(start time.Time) { slog.Debug(fmt.Sprintf("View() %s", time.Since(start))) }(time.Now())
 
-	m.help.Width = m.w - lipgloss.Width(m.status) - 3
+	status := "waiting for data..."
+	if len(m.statuses) > 0 {
+		statusfmt := []string{"logs", "spans", "metrics", "payloads"}
+		for i, s := range statusfmt {
+			if i == int(m.mode) {
+				statusfmt[i] = lipgloss.NewStyle().Bold(true).Render(s)
+			} else {
+				statusfmt[i] = s
+			}
+			statusfmt[i] += "=%s"
+		}
+		status = fmt.Sprintf(strings.Join(statusfmt, " "), m.statuses...)
+	}
 
 	keys := []key.Binding{m.keyMap.Next}
 	if m, ok := m.models[m.mode].(components.Helpful); ok {
 		keys = append(m.Help(), keys...)
 	}
+
+	m.help.Width = m.w - lipgloss.Width(status) - 3
 	help := m.help.ShortHelpView(keys)
 
-	gap := strings.Repeat(" ", max(0, m.w-lipgloss.Width(help+m.status)))
-	header := m.status + gap + help
+	gap := strings.Repeat(" ", max(0, m.w-lipgloss.Width(help+status)))
+	header := status + gap + help
 
 	return header + "\n" + m.models[m.mode].View()
 }
