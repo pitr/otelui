@@ -1,0 +1,108 @@
+package components
+
+import (
+	"time"
+
+	"github.com/NimbleMarkets/ntcharts/linechart/timeserieslinechart"
+	"github.com/charmbracelet/bubbles/key"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+
+	"github.com/pitr/otelui/server"
+)
+
+type Timeseries struct {
+	isFocused bool
+	title     string
+
+	model timeserieslinechart.Model
+
+	w, h int
+
+	name string
+}
+
+func NewTimeseries(title string) *Timeseries {
+	return &Timeseries{
+		title: title,
+		model: timeserieslinechart.New(0, 0,
+			timeserieslinechart.WithUpdateHandler(timeserieslinechart.SecondNoZoomUpdateHandler(1)),
+			timeserieslinechart.WithXLabelFormatter(timeserieslinechart.HourTimeLabelFormatter()),
+		),
+	}
+}
+
+func (t Timeseries) Help() []key.Binding {
+	return []key.Binding{}
+}
+
+func (t Timeseries) Init() tea.Cmd {
+	return nil
+}
+
+func (t *Timeseries) Update(msg tea.Msg) (cmd tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		t.w = msg.Width
+		t.h = msg.Height
+		t.model.Resize(t.w, t.h)
+		t.model.Focus()
+		// case tea.KeyMsg:
+	// switch {
+	// case key.Matches(msg, v.keyMap.Left):
+	// v.xOffset = max(v.xOffset-1, 0)
+	// case key.Matches(msg, v.keyMap.Right):
+	// v.xOffset = min(v.xOffset+1, v.longestLineWidth-v.w)
+	// }
+	// case tea.MouseMsg:
+	// if msg.Action != tea.MouseActionPress {
+	// 	break
+	// }
+	// switch msg.Button {
+	// case tea.MouseButtonWheelLeft:
+	// 	v.xOffset = max(v.xOffset-1, 0)
+	// case tea.MouseButtonWheelRight:
+	// 	v.xOffset = min(v.xOffset+1, v.longestLineWidth-v.w)
+	// }
+	default:
+		t.model, cmd = t.model.Update(msg)
+	}
+
+	return cmd
+}
+
+func (t *Timeseries) View() string {
+	if t.name == "" {
+		return ""
+	}
+	t.model.Clear()
+	t.model.ClearAllData()
+	t.model.SetViewXYRange(float64(time.Now().Unix()), float64(time.Now().Unix()), 0, 1)
+	t.model.SetYRange(0, 1)
+	dps := server.GetDatapoints(t.name)
+	if dps == nil {
+		return ""
+	}
+	for i, ts := range dps.Times {
+		t.model.Push(timeserieslinechart.TimePoint{Time: time.Unix(0, int64(ts)), Value: dps.Values[i]})
+	}
+	t.model.DrawAll()
+	return t.model.View()
+}
+
+func (t *Timeseries) SetContent(name string) {
+	t.name = name
+}
+
+func (t Timeseries) IsFocused() bool {
+	return t.isFocused
+}
+
+func (t *Timeseries) SetFocus(b bool) {
+	t.isFocused = b
+	if b {
+		t.model.AxisStyle = lipgloss.NewStyle().Foreground(HighlightColor)
+	} else {
+		t.model.AxisStyle = lipgloss.NewStyle()
+	}
+}

@@ -1,14 +1,18 @@
 package server
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	v1 "go.opentelemetry.io/proto/otlp/common/v1"
 	logs "go.opentelemetry.io/proto/otlp/logs/v1"
 	metrics "go.opentelemetry.io/proto/otlp/metrics/v1"
 	traces "go.opentelemetry.io/proto/otlp/trace/v1"
+
+	"github.com/pitr/otelui/utils"
 )
 
 type Payload struct {
@@ -24,6 +28,11 @@ type Log struct {
 	ScopeLogs    *logs.ScopeLogs
 }
 
+type Datapoints struct {
+	Times  []uint64
+	Values []float64
+}
+
 var Storage struct {
 	sync.RWMutex
 
@@ -32,13 +41,22 @@ var Storage struct {
 
 	payloads []*Payload
 	logs     []*Log
+	metrics  map[string]*Datapoints
+}
+
+type ConsumeEvent struct {
+	Payloads int
+	Logs     int
+	Spans    int
+	Metrics  int
 }
 
 var Send func(msg any)
 
-func init() {
+func setupStorage() {
 	Storage.logs = []*Log{}
 	Storage.payloads = []*Payload{}
+	Storage.metrics = map[string]*Datapoints{}
 
 	go func() {
 		for range time.Tick(time.Second) {
@@ -117,38 +135,73 @@ func consumeMetrics(p []*metrics.ResourceMetrics) {
 	now := time.Now().UTC()
 	metricsReceived := 0
 
-	for _, rm := range p {
-		for _, sm := range rm.ScopeMetrics {
-			metricsReceived += len(sm.Metrics)
-		}
-	}
-
 	Storage.Lock()
 	defer Storage.Unlock()
+
+	for _, rm := range p {
+		for _, sm := range rm.ScopeMetrics {
+			for _, m := range sm.Metrics {
+				switch d := m.Data.(type) {
+				case *metrics.Metric_Gauge:
+					for _, dp := range d.Gauge.DataPoints {
+						metricsReceived++
+						attrs := serializeAttributes(m.Name, dp.Attributes, sm.Scope.Attributes, rm.Resource.Attributes)
+						if Storage.metrics[attrs] == nil {
+							Storage.metrics[attrs] = &Datapoints{}
+						}
+						Storage.metrics[attrs].Times = append(Storage.metrics[attrs].Times, dp.TimeUnixNano)
+
+						switch v := dp.Value.(type) {
+						case *metrics.NumberDataPoint_AsInt:
+							Storage.metrics[attrs].Values = append(Storage.metrics[attrs].Values, float64(v.AsInt))
+						case *metrics.NumberDataPoint_AsDouble:
+							Storage.metrics[attrs].Values = append(Storage.metrics[attrs].Values, v.AsDouble)
+						}
+					}
+				case *metrics.Metric_Sum:
+					for _, dp := range d.Sum.DataPoints {
+						metricsReceived++
+						attrs := serializeAttributes(m.Name, dp.Attributes, sm.Scope.Attributes, rm.Resource.Attributes)
+						if Storage.metrics[attrs] == nil {
+							Storage.metrics[attrs] = &Datapoints{}
+						}
+						Storage.metrics[attrs].Times = append(Storage.metrics[attrs].Times, dp.TimeUnixNano)
+
+						switch v := dp.Value.(type) {
+						case *metrics.NumberDataPoint_AsInt:
+							Storage.metrics[attrs].Values = append(Storage.metrics[attrs].Values, float64(v.AsInt))
+						case *metrics.NumberDataPoint_AsDouble:
+							Storage.metrics[attrs].Values = append(Storage.metrics[attrs].Values, v.AsDouble)
+						}
+					}
+				case *metrics.Metric_Summary:
+					for _, dp := range d.Summary.DataPoints {
+						metricsReceived++
+						attrs := serializeAttributes(m.Name, dp.Attributes, sm.Scope.Attributes, rm.Resource.Attributes)
+						if Storage.metrics[attrs] == nil {
+							Storage.metrics[attrs] = &Datapoints{}
+						}
+						Storage.metrics[attrs].Times = append(Storage.metrics[attrs].Times, dp.TimeUnixNano)
+						Storage.metrics[attrs].Values = append(Storage.metrics[attrs].Values, dp.Sum)
+					}
+				case *metrics.Metric_Histogram:
+				case *metrics.Metric_ExponentialHistogram:
+				}
+			}
+		}
+	}
 
 	Storage.payloads = append(Storage.payloads, &Payload{Received: now, Num: metricsReceived, Payload: p})
 	Storage.metricsReceived += metricsReceived
 }
 
-func GetPayloads() []*Payload {
-	Storage.RLock()
-	defer Storage.RUnlock()
-	res := make([]*Payload, len(Storage.payloads))
-	copy(res, Storage.payloads)
-	return res
-}
-
-func GetLogs() []*Log {
-	Storage.RLock()
-	defer Storage.RUnlock()
-	res := make([]*Log, len(Storage.logs))
-	copy(res, Storage.logs)
-	return res
-}
-
-type ConsumeEvent struct {
-	Payloads int
-	Logs     int
-	Spans    int
-	Metrics  int
+func serializeAttributes(name string, attrs ...[]*v1.KeyValue) string {
+	hashes := []string{}
+	for _, attr := range attrs {
+		for _, a := range attr {
+			hashes = append(hashes, fmt.Sprintf("%s=%q", a.Key, utils.AnyToString(a.Value)))
+		}
+	}
+	sort.Strings(hashes)
+	return fmt.Sprintf("%s{%s}", name, strings.Join(hashes, ","))
 }

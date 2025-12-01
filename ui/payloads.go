@@ -18,7 +18,7 @@ import (
 )
 
 type payloadsModel struct {
-	view components.Splitview[*components.Viewport]
+	view components.Splitview[*components.Viewport, *components.Viewport]
 
 	lastPayloads int
 }
@@ -70,7 +70,7 @@ func (m *payloadsModel) updateMainContent() {
 		s := fmt.Sprintf("%s %3d %s", nanoToString(uint64(p.Received.UnixNano())), p.Num, t)
 		payloads = append(payloads, components.ViewRow{Str: s, Yank: s, Raw: p})
 	}
-	m.view.Get(0).SetContent(payloads)
+	m.view.Top().SetContent(payloads)
 }
 
 func (m *payloadsModel) updateDetailsContent(selected components.ViewRow) {
@@ -284,7 +284,7 @@ func (m *payloadsModel) updateDetailsContent(selected components.ViewRow) {
 			lines = append(lines, components.ViewRow{Str: l, Yank: treeTrim(l)})
 		}
 	}
-	m.view.Get(1).SetContent(lines)
+	m.view.Bot().SetContent(lines)
 }
 
 func (m payloadsModel) Help() []key.Binding {

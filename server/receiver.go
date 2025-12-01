@@ -28,7 +28,7 @@ type metricsReceiver struct {
 
 // NewReceiver creates a new OTLP receiver
 func Start(ctx context.Context, cancel context.CancelFunc) {
-	var err error
+	setupStorage()
 
 	grpcListener, err := net.Listen("tcp", ":4317")
 	if err != nil {

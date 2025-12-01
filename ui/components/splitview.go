@@ -30,21 +30,23 @@ type keysSplitview struct {
 	Prev     key.Binding
 }
 
-type Splitview[T SplitableModel[T]] struct {
+type Splitview[T SplitableModel[T], B SplitableModel[B]] struct {
 	w         int
 	h         [2]int
-	views     [2]T
+	top       T
+	bot       B
 	keyMap    keysSplitview
 	_selected lipgloss.Style
 }
 
-func NewSplitview[T SplitableModel[T]](top, bottom T) Splitview[T] {
+func NewSplitview[T SplitableModel[T], B SplitableModel[B]](top T, bot B) Splitview[T, B] {
 	top.SetFocus(true)
-	bottom.SetFocus(false)
+	bot.SetFocus(false)
 
-	return Splitview[T]{
-		h:     [2]int{0, 0},
-		views: [2]T{top, bottom},
+	return Splitview[T, B]{
+		h:   [2]int{0, 0},
+		top: top,
+		bot: bot,
 		keyMap: keysSplitview{
 			Increase: key.NewBinding(key.WithKeys("="), key.WithHelp("-/=", "resize")),
 			Decrease: key.NewBinding(key.WithKeys("-")),
@@ -54,11 +56,11 @@ func NewSplitview[T SplitableModel[T]](top, bottom T) Splitview[T] {
 	}
 }
 
-func (m Splitview[T]) Init() tea.Cmd {
+func (m Splitview[T, B]) Init() tea.Cmd {
 	return nil
 }
 
-func (m Splitview[T]) Update(msg tea.Msg) (Splitview[T], tea.Cmd) {
+func (m Splitview[T, B]) Update(msg tea.Msg) (Splitview[T, B], tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
@@ -67,106 +69,105 @@ func (m Splitview[T]) Update(msg tea.Msg) (Splitview[T], tea.Cmd) {
 		m.h[0] = msg.Height / 2
 		m.h[1] = msg.Height - m.h[0]
 		cmd = tea.Batch(
-			m.views[0].Update(tea.WindowSizeMsg{Width: m.w, Height: m.h[0]}),
-			m.views[1].Update(tea.WindowSizeMsg{Width: m.w, Height: m.h[1]}),
+			m.top.Update(tea.WindowSizeMsg{Width: m.w, Height: m.h[0]}),
+			m.bot.Update(tea.WindowSizeMsg{Width: m.w, Height: m.h[1]}),
 		)
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keyMap.Increase):
 			i := 0
-			if m.views[1].IsFocused() {
+			if m.bot.IsFocused() {
 				i = 1
 			}
 			if m.h[1-i] >= minSplit+splitStep {
 				m.h[1-i] -= splitStep
 				m.h[i] += splitStep
 				cmd = tea.Batch(
-					m.views[0].Update(tea.WindowSizeMsg{Width: m.w, Height: m.h[0]}),
-					m.views[1].Update(tea.WindowSizeMsg{Width: m.w, Height: m.h[1]}),
+					m.top.Update(tea.WindowSizeMsg{Width: m.w, Height: m.h[0]}),
+					m.bot.Update(tea.WindowSizeMsg{Width: m.w, Height: m.h[1]}),
 				)
 			}
 		case key.Matches(msg, m.keyMap.Decrease):
 			i := 0
-			if m.views[1].IsFocused() {
+			if m.bot.IsFocused() {
 				i = 1
 			}
 			if m.h[i] >= minSplit+splitStep {
 				m.h[i] -= splitStep
 				m.h[1-i] += splitStep
 				cmd = tea.Batch(
-					m.views[0].Update(tea.WindowSizeMsg{Width: m.w, Height: m.h[0]}),
-					m.views[1].Update(tea.WindowSizeMsg{Width: m.w, Height: m.h[1]}),
+					m.top.Update(tea.WindowSizeMsg{Width: m.w, Height: m.h[0]}),
+					m.bot.Update(tea.WindowSizeMsg{Width: m.w, Height: m.h[1]}),
 				)
 			}
 		case key.Matches(msg, m.keyMap.Next, m.keyMap.Prev):
-			m.views[0].SetFocus(!m.views[0].IsFocused())
-			m.views[1].SetFocus(!m.views[1].IsFocused())
+			m.top.SetFocus(!m.top.IsFocused())
+			m.bot.SetFocus(!m.bot.IsFocused())
 		default:
-			for i := range m.views {
-				if m.views[i].IsFocused() {
-					cmd = m.views[i].Update(msg)
-					break
-				}
+			if m.top.IsFocused() {
+				cmd = m.top.Update(msg)
+			} else {
+				cmd = m.bot.Update(msg)
 			}
 		}
 	case tea.MouseMsg:
 		leftClick := msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress
-		view := 0
+		top := true
 		inside := false
 		switch {
 		case msg.Y > 0 && msg.Y < m.h[0]-splitBorderSize:
 			inside = true
-			view = 0
 			msg.Y -= splitBorderSize
 		case msg.Y > m.h[0] && msg.Y < m.h[0]+m.h[1]-splitBorderSize:
 			inside = true
 			msg.Y -= m.h[0] + splitBorderSize
 			fallthrough
 		case msg.Y == m.h[0] || msg.Y == m.h[0]+m.h[1]-splitBorderSize:
-			view = 1
+			top = false
 		}
 
 		switch {
 		case leftClick:
-			m.views[1-view].SetFocus(false)
-			m.views[view].SetFocus(true)
+			m.top.SetFocus(top)
+			m.bot.SetFocus(!top)
 			fallthrough
 		default:
 			if inside {
-				cmd = m.views[view].Update(msg)
+				if top {
+					cmd = m.top.Update(msg)
+				} else {
+					cmd = m.bot.Update(msg)
+				}
 			}
 		}
 	default:
-		for i := range m.views {
-			if m.views[i].IsFocused() {
-				cmd = m.views[i].Update(msg)
-				break
-			}
+		if m.top.IsFocused() {
+			cmd = m.top.Update(msg)
+		} else {
+			cmd = m.bot.Update(msg)
 		}
 	}
 
 	return m, cmd
 }
 
-func (m Splitview[T]) View() string {
+func (m Splitview[T, B]) View() string {
 	var buf strings.Builder
-	buf.WriteString(m.views[0].View())
+	buf.WriteString(m.top.View())
 	buf.WriteByte('\n')
-	buf.WriteString(m.views[1].View())
+	buf.WriteString(m.bot.View())
 	return buf.String()
 }
 
-func (m *Splitview[T]) Get(i int) T {
-	return m.views[i]
-}
+func (m *Splitview[T, B]) Top() T { return m.top }
+func (m *Splitview[T, B]) Bot() B { return m.bot }
 
-func (m Splitview[T]) Help() []key.Binding {
+func (m Splitview[T, B]) Help() []key.Binding {
 	keys := []key.Binding{m.keyMap.Increase, m.keyMap.Next}
-	for i := range m.views {
-		if m.views[i].IsFocused() {
-			keys = append(m.views[i].Help(), keys...)
-			break
-		}
+	if m.top.IsFocused() {
+		keys = append(m.top.Help(), keys...)
+	} else {
+		keys = append(m.bot.Help(), keys...)
 	}
 	return keys
 }

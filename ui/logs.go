@@ -20,7 +20,7 @@ import (
 )
 
 type logsModel struct {
-	view     components.Splitview[*components.Viewport]
+	view     components.Splitview[*components.Viewport, *components.Viewport]
 	lastLogs int
 }
 
@@ -96,13 +96,13 @@ func (m *logsModel) updateMainContent() {
 		lines = append(lines, components.ViewRow{Str: str, Yank: ansi.Strip(str), Raw: l})
 		buf.Reset()
 	}
-	m.view.Get(0).SetContent(lines)
+	m.view.Top().SetContent(lines)
 }
 
 func (m *logsModel) updateDetailsContent(selected components.ViewRow) {
 	selectedLog := selected.Raw.(*server.Log)
 	if selectedLog == nil {
-		m.view.Get(1).SetContent([]components.ViewRow{})
+		m.view.Bot().SetContent([]components.ViewRow{})
 		return
 	}
 
@@ -135,5 +135,5 @@ func (m *logsModel) updateDetailsContent(selected components.ViewRow) {
 	for l := range strings.SplitSeq(t.String(), "\n") {
 		lines = append(lines, components.ViewRow{Str: l, Yank: treeTrim(l)})
 	}
-	m.view.Get(1).SetContent(lines)
+	m.view.Bot().SetContent(lines)
 }
