@@ -7,9 +7,10 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss/tree"
-	"github.com/pitr/otelui/utils"
 	v1 "go.opentelemetry.io/proto/otlp/common/v1"
 	metrics "go.opentelemetry.io/proto/otlp/metrics/v1"
+
+	"github.com/pitr/otelui/utils"
 )
 
 func AnyToType(v *v1.AnyValue) string {

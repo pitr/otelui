@@ -1,6 +1,8 @@
 package components
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"github.com/charmbracelet/lipgloss"
+)
 
 var (
 	FadedColor     = lipgloss.AdaptiveColor{Light: "#E6E6E6", Dark: "#383838"}
