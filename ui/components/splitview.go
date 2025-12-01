@@ -48,7 +48,7 @@ func NewSplitview[T SplitableModel[T], B SplitableModel[B]](top T, bot B) Splitv
 		top: top,
 		bot: bot,
 		keyMap: keysSplitview{
-			Increase: key.NewBinding(key.WithKeys("="), key.WithHelp("-/=", "resize")),
+			Increase: key.NewBinding(key.WithKeys("="), key.WithHelp("- =", "resize")),
 			Decrease: key.NewBinding(key.WithKeys("-")),
 			Next:     key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "switch pane")),
 			Prev:     key.NewBinding(key.WithKeys("shift+tab")),
