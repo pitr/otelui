@@ -42,6 +42,7 @@ type Viewport struct {
 
 	selected         int
 	xOffset          int
+	yOffset          int
 	lines            []ViewRow
 	longestLineWidth int
 }
@@ -107,23 +108,15 @@ func (v *Viewport) Update(msg tea.Msg) tea.Cmd {
 		}
 		switch msg.Button {
 		case tea.MouseButtonWheelUp:
-			if msg.Shift {
-				v.xOffset = max(v.xOffset-1, 0)
-			} else {
-				v.scrollTo(v.selected - 1)
-			}
+			v.yOffset = max(0, v.yOffset-1)
 		case tea.MouseButtonWheelDown:
-			if msg.Shift {
-				v.xOffset = min(v.xOffset+1, v.longestLineWidth-v.w)
-			} else {
-				v.scrollTo(v.selected + 1)
-			}
+			v.yOffset = max(0, min(len(v.lines)-v.h, v.yOffset+1))
 		case tea.MouseButtonWheelLeft:
 			v.xOffset = max(v.xOffset-1, 0)
 		case tea.MouseButtonWheelRight:
 			v.xOffset = min(v.xOffset+1, v.longestLineWidth-v.w)
 		case tea.MouseButtonLeft:
-			v.scrollTo(msg.Y + v.yOffset())
+			v.scrollTo(msg.Y + v.yOffset)
 		}
 	}
 
@@ -161,7 +154,7 @@ func (v *Viewport) View() string {
 				v.h,
 				len(v.lines),
 				len(lines),
-				v.selected,
+				v.yOffset,
 			),
 		),
 		strings.Repeat(v._border.Top, lipgloss.Width(v.title)+3),
@@ -196,31 +189,27 @@ func (v *Viewport) SetFocus(b bool) {
 	v.isFocused = b
 }
 
-func (v *Viewport) scrollTo(i int) {
-	i = max(0, min(i, len(v.lines)-1))
-	if v.selected == i {
+func (v *Viewport) scrollTo(s int) {
+	s = max(0, min(s, len(v.lines)-1))
+	if v.selected == s {
 		return
 	}
-	v.selected = i
+	v.selected = s
+	v.yOffset = max(0, v.selected-v.h/2)
+	if v.yOffset+v.h > len(v.lines) {
+		v.yOffset = max(0, len(v.lines)-v.h)
+	}
 	if len(v.lines) > 0 && v.onSelect != nil {
 		v.onSelect(v.lines[v.selected])
 	}
 }
 
-func (v Viewport) yOffset() int {
-	top := max(0, v.selected-v.h/2)
-	if top+v.h > len(v.lines) {
-		top = max(0, len(v.lines)-v.h)
-	}
-	return top
-}
-
 func (v Viewport) visibleLines() (lines []string) {
-	top := v.yOffset()
+	top := v.yOffset
 	bottom := min(top+v.h, len(v.lines))
 	for i, l := range v.lines[top:bottom] {
 		lines = append(lines, ansi.Cut(l.Str, v.xOffset, v.xOffset+v.w))
-		if i+top == v.selected {
+		if i+top == v.selected && v.isFocused {
 			lines[i] = v._selected.Render(lipgloss.PlaceHorizontal(v.w, lipgloss.Left, lines[i]))
 		}
 	}
