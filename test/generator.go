@@ -102,6 +102,7 @@ func setupOTelSDK() (func(context.Context) error, error) {
 		metric.WithReader(metric.NewPeriodicReader(
 			metricExporter,
 			metric.WithProducer(runtime.NewProducer()),
+			metric.WithInterval(5*time.Second),
 		)),
 	)
 	shutdownFuncs = append(shutdownFuncs, meterProvider.Shutdown)
