@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -68,7 +67,7 @@ func (m *payloadsModel) updateMainContent() {
 		case []*metrics.ResourceMetrics:
 			t = "metrics"
 		}
-		s := fmt.Sprintf("%s %3d %s", p.Received.UTC().Format(time.RFC3339), p.Num, t)
+		s := fmt.Sprintf("%s %3d %s", nanoToString(uint64(p.Received.UnixNano())), p.Num, t)
 		payloads = append(payloads, components.ViewRow{Str: s, Yank: s, Raw: p})
 	}
 	m.view.Get(0).SetContent(payloads)
