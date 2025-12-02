@@ -2,7 +2,6 @@ package ui
 
 import (
 	"sort"
-	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -55,10 +54,11 @@ func (m metricsModel) Help() []key.Binding {
 
 func (m *metricsModel) updateMainContent() {
 	lines := []components.ViewRow{}
-	for _, m := range server.GetMetrics() {
+	ms := server.GetMetrics()
+	sort.Strings(ms)
+	for _, m := range ms {
 		lines = append(lines, components.ViewRow{Str: m, Yank: m, Raw: m})
 	}
-	sort.Slice(lines, func(i, j int) bool { return strings.Compare(lines[i].Str, lines[j].Str) < 0 })
 	m.view.Top().SetContent(lines)
 }
 
