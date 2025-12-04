@@ -96,7 +96,7 @@ func (v *Viewport) Update(msg tea.Msg) tea.Cmd {
 		case key.Matches(msg, v.keyMap.Left):
 			v.xOffset = max(v.xOffset-1, 0)
 		case key.Matches(msg, v.keyMap.Right):
-			v.xOffset = min(v.xOffset+1, v.longestLineWidth-v.w)
+			v.xOffset = max(0, min(v.xOffset+1, v.longestLineWidth-v.w))
 		case key.Matches(msg, v.keyMap.Yank):
 			if len(v.lines) > 0 {
 				clipboard.WriteAll(v.lines[v.selected].Yank)
@@ -114,7 +114,7 @@ func (v *Viewport) Update(msg tea.Msg) tea.Cmd {
 		case tea.MouseButtonWheelLeft:
 			v.xOffset = max(v.xOffset-1, 0)
 		case tea.MouseButtonWheelRight:
-			v.xOffset = min(v.xOffset+1, v.longestLineWidth-v.w)
+			v.xOffset = max(0, min(v.xOffset+1, v.longestLineWidth-v.w))
 		case tea.MouseButtonLeft:
 			v.scrollTo(msg.Y + v.yOffset)
 		}
@@ -166,7 +166,7 @@ func (v *Viewport) View() string {
 func (v *Viewport) SetContent(lines []ViewRow) {
 	v.lines = lines
 	v.longestLineWidth = v.findLongestLineWidth(lines)
-	v.xOffset = 0
+	v.xOffset = max(0, min(v.xOffset, v.longestLineWidth-v.w))
 
 	if v.selected >= len(v.lines) {
 		v.scrollTo(len(v.lines) - 1)
