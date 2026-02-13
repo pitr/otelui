@@ -101,7 +101,7 @@ func (t Timeseries) IsFocused() bool {
 func (t *Timeseries) SetFocus(b bool) {
 	t.isFocused = b
 	if b {
-		t.model.AxisStyle = lipgloss.NewStyle().Foreground(HighlightColor)
+		t.model.AxisStyle = lipgloss.NewStyle().Foreground(AccentColor)
 	} else {
 		t.model.AxisStyle = lipgloss.NewStyle()
 	}

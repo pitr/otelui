@@ -59,7 +59,7 @@ func newRootModel() tea.Model {
 			mRootMetrics:  newMetricsModel(),
 			mRootPayloads: newPayloadsModel(),
 		},
-		_selected: lipgloss.NewStyle().Background(components.FadedColor).Bold(true),
+		_selected: lipgloss.NewStyle().Background(components.SelectionColor).Bold(true),
 	}
 }
 
@@ -85,16 +85,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		spansStyle := lipgloss.NewStyle()
 		metricsStyle := lipgloss.NewStyle()
 		if msg.Payloads != m.ce.Payloads {
-			payloadsStyle = payloadsStyle.Background(components.HighlightColor)
+			payloadsStyle = payloadsStyle.Background(components.AccentColor)
 		}
 		if msg.Logs != m.ce.Logs {
-			logsStyle = logsStyle.Background(components.HighlightColor)
+			logsStyle = logsStyle.Background(components.AccentColor)
 		}
 		if msg.Spans != m.ce.Spans {
-			spansStyle = spansStyle.Background(components.HighlightColor)
+			spansStyle = spansStyle.Background(components.AccentColor)
 		}
 		if msg.Metrics != m.ce.Metrics {
-			metricsStyle = metricsStyle.Background(components.HighlightColor)
+			metricsStyle = metricsStyle.Background(components.AccentColor)
 		}
 		m.statuses = []any{
 			logsStyle.Render(strconv.Itoa(msg.Logs)),
