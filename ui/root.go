@@ -89,16 +89,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		spansStyle := lipgloss.NewStyle()
 		metricsStyle := lipgloss.NewStyle()
 		if msg.Payloads != m.ce.Payloads {
-			payloadsStyle = payloadsStyle.Background(components.AccentColor)
+			payloadsStyle = payloadsStyle.Background(components.SelectionColor)
 		}
 		if msg.Logs != m.ce.Logs {
-			logsStyle = logsStyle.Background(components.AccentColor)
+			logsStyle = logsStyle.Background(components.SelectionColor)
 		}
 		if msg.Spans != m.ce.Spans {
-			spansStyle = spansStyle.Background(components.AccentColor)
+			spansStyle = spansStyle.Background(components.SelectionColor)
 		}
 		if msg.Metrics != m.ce.Metrics {
-			metricsStyle = metricsStyle.Background(components.AccentColor)
+			metricsStyle = metricsStyle.Background(components.SelectionColor)
 		}
 		m.statuses = []any{
 			logsStyle.Render(strconv.Itoa(msg.Logs)),
