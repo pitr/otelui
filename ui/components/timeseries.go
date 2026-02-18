@@ -11,6 +11,8 @@ import (
 	"github.com/pitr/otelui/server"
 )
 
+var TZUTC bool
+
 type Timeseries struct {
 	isFocused bool
 	title     string
@@ -27,7 +29,6 @@ func NewTimeseries(title string) *Timeseries {
 		title: title,
 		model: timeserieslinechart.New(0, 0,
 			timeserieslinechart.WithUpdateHandler(timeserieslinechart.SecondNoZoomUpdateHandler(1)),
-			timeserieslinechart.WithXLabelFormatter(timeserieslinechart.HourTimeLabelFormatter()),
 		),
 	}
 }
@@ -74,6 +75,15 @@ func (t *Timeseries) Update(msg tea.Msg) (cmd tea.Cmd) {
 func (t *Timeseries) View() string {
 	if t.name == "" {
 		return ""
+	}
+	if TZUTC {
+		t.model.XLabelFormatter = func(_ int, v float64) string {
+			return time.Unix(int64(v), 0).UTC().Format("15:04:05")
+		}
+	} else {
+		t.model.XLabelFormatter = func(_ int, v float64) string {
+			return time.Unix(int64(v), 0).Local().Format("15:04:05")
+		}
 	}
 	t.model.Clear()
 	t.model.ClearAllData()

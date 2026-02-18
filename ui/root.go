@@ -31,6 +31,7 @@ type keyMapRoot struct {
 	Next key.Binding
 	Prev key.Binding
 	Quit key.Binding
+	TZ   key.Binding
 }
 
 type model struct {
@@ -51,6 +52,7 @@ func newRootModel() tea.Model {
 			Next: key.NewBinding(key.WithKeys("]"), key.WithHelp("[ ]", "switch mode")),
 			Prev: key.NewBinding(key.WithKeys("[")),
 			Quit: key.NewBinding(key.WithKeys("ctrl+c", "q")),
+			TZ:   key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "toggle UTC/local")),
 		},
 		help: help.New(),
 		models: map[mRoot]tea.Model{
@@ -129,6 +131,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.mode = (m.mode + 1) % mRoot(len(m.models))
 		case key.Matches(msg, m.keyMap.Prev):
 			m.mode = (m.mode - 1) % mRoot(len(m.models))
+		case key.Matches(msg, m.keyMap.TZ):
+			tzUTC = !tzUTC
+			components.TZUTC = tzUTC
 		default:
 			m.models[m.mode], cmd = m.models[m.mode].Update(msg)
 		}
@@ -142,21 +147,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	defer func(start time.Time) { slog.Debug(fmt.Sprintf("View() %s", time.Since(start))) }(time.Now())
 
+	tz := "local"
+	if tzUTC {
+		tz = "UTC"
+	}
 	status := "waiting for data..."
 	if len(m.statuses) > 0 {
 		statusfmt := []string{"logs", "spans", "metrics", "payloads"}
 		for i, s := range statusfmt {
 			if i == int(m.mode) {
-				statusfmt[i] = lipgloss.NewStyle().Bold(true).Render(s)
-			} else {
-				statusfmt[i] = s
+				s = lipgloss.NewStyle().Bold(true).Render(strings.ToUpper(s))
 			}
-			statusfmt[i] += "=%s"
+			statusfmt[i] = s + "=%s"
 		}
 		status = fmt.Sprintf(strings.Join(statusfmt, " "), m.statuses...)
 	}
+	status += " tz=" + tz
 
-	keys := []key.Binding{m.keyMap.Next}
+	keys := []key.Binding{m.keyMap.TZ, m.keyMap.Next}
 	if m, ok := m.models[m.mode].(components.Helpful); ok {
 		keys = append(m.Help(), keys...)
 	}

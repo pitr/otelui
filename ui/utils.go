@@ -37,8 +37,14 @@ func AnyToType(v *v1.AnyValue) string {
 	}
 }
 
+var tzUTC bool
+
 func nanoToString(nsec uint64) string {
-	return time.Unix(0, int64(nsec)).UTC().Format("2006-01-02T15:04:05.000000000")
+	t := time.Unix(0, int64(nsec))
+	if tzUTC {
+		t = t.UTC()
+	}
+	return t.Format("2006-01-02T15:04:05.000000000")
 }
 
 // treeTrim removes leading tree structure produced by lipgloss/tree, used for yanking
