@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/hex"
 	"fmt"
 	"sort"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	v1 "go.opentelemetry.io/proto/otlp/common/v1"
 	logs "go.opentelemetry.io/proto/otlp/logs/v1"
 	metrics "go.opentelemetry.io/proto/otlp/metrics/v1"
+	resource "go.opentelemetry.io/proto/otlp/resource/v1"
 	traces "go.opentelemetry.io/proto/otlp/trace/v1"
 
 	"github.com/pitr/otelui/utils"
@@ -33,15 +35,28 @@ type Datapoints struct {
 	Values []float64
 }
 
+type Span struct {
+	Span     *traces.Span
+	Resource *resource.Resource
+	Scope    *v1.InstrumentationScope
+}
+
+type Trace struct {
+	TraceID string
+	Spans   []*Span
+}
+
 var Storage struct {
 	sync.RWMutex
 
 	spansReceived   int
 	metricsReceived int
 
-	payloads []*Payload
-	logs     []*Log
-	metrics  map[string]*Datapoints
+	payloads   []*Payload
+	logs       []*Log
+	metrics    map[string]*Datapoints
+	traces     map[string]*Trace
+	traceOrder []string
 }
 
 type ConsumeEvent struct {
@@ -59,6 +74,8 @@ func Reset() {
 	Storage.logs = []*Log{}
 	Storage.payloads = []*Payload{}
 	Storage.metrics = map[string]*Datapoints{}
+	Storage.traces = map[string]*Trace{}
+	Storage.traceOrder = []string{}
 	Storage.spansReceived = 0
 	Storage.metricsReceived = 0
 }
@@ -67,6 +84,8 @@ func setupStorage() {
 	Storage.logs = []*Log{}
 	Storage.payloads = []*Payload{}
 	Storage.metrics = map[string]*Datapoints{}
+	Storage.traces = map[string]*Trace{}
+	Storage.traceOrder = []string{}
 
 	go func() {
 		for range time.Tick(time.Second) {
@@ -123,10 +142,15 @@ func consumeTraces(p []*traces.ResourceSpans) {
 
 	now := time.Now().UTC()
 	spansReceived := 0
+	byTrace := map[string][]*Span{}
 
 	for _, rs := range p {
 		for _, ss := range rs.ScopeSpans {
-			spansReceived += len(ss.Spans)
+			for _, s := range ss.Spans {
+				spansReceived++
+				tid := hex.EncodeToString(s.TraceId)
+				byTrace[tid] = append(byTrace[tid], &Span{Span: s, Resource: rs.Resource, Scope: ss.Scope})
+			}
 		}
 	}
 
@@ -134,6 +158,14 @@ func consumeTraces(p []*traces.ResourceSpans) {
 	defer Storage.Unlock()
 
 	Storage.payloads = append(Storage.payloads, &Payload{Received: now, Num: spansReceived, Payload: p})
+	for tid, spans := range byTrace {
+		if t, ok := Storage.traces[tid]; ok {
+			t.Spans = append(t.Spans, spans...)
+		} else {
+			Storage.traces[tid] = &Trace{TraceID: tid, Spans: spans}
+			Storage.traceOrder = append(Storage.traceOrder, tid)
+		}
+	}
 	Storage.spansReceived += spansReceived
 }
 

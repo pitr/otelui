@@ -6,9 +6,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/tree"
+	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 	v1 "go.opentelemetry.io/proto/otlp/common/v1"
 	metrics "go.opentelemetry.io/proto/otlp/metrics/v1"
+	resource "go.opentelemetry.io/proto/otlp/resource/v1"
 
 	"github.com/pitr/otelui/utils"
 )
@@ -119,4 +122,21 @@ func ptrToString(x *float64) string {
 		return "<nil>"
 	}
 	return fmt.Sprintf("%f", *x)
+}
+
+func resourceToServiceName(r *resource.Resource) string {
+	if r == nil {
+		return "-"
+	}
+	for _, attr := range r.Attributes {
+		if attr.Key == string(semconv.ServiceNameKey) {
+			return utils.AnyToString(attr.Value)
+		}
+	}
+	return "-"
+}
+
+// renderForeground resets only foreground instead of reset all (so row select works correctly)
+func renderForeground(c lipgloss.TerminalColor, str string) string {
+	return strings.ReplaceAll(lipgloss.NewStyle().Foreground(c).Render(str), "\x1b[0m", "\x1b[39m")
 }

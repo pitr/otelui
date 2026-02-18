@@ -16,6 +16,19 @@ func GetLogs() []*Log {
 	return res
 }
 
+func GetTraces() []*Trace {
+	Storage.RLock()
+	defer Storage.RUnlock()
+	res := make([]*Trace, len(Storage.traceOrder))
+	for i, id := range Storage.traceOrder {
+		orig := Storage.traces[id]
+		t := &Trace{TraceID: orig.TraceID, Spans: make([]*Span, len(orig.Spans))}
+		copy(t.Spans, orig.Spans)
+		res[i] = t
+	}
+	return res
+}
+
 func GetMetrics() []string {
 	Storage.RLock()
 	defer Storage.RUnlock()

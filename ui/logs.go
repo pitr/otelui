@@ -11,7 +11,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/tree"
 	"github.com/charmbracelet/x/ansi"
-	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 	logs "go.opentelemetry.io/proto/otlp/logs/v1"
 
 	"github.com/pitr/otelui/server"
@@ -71,30 +70,23 @@ func (m *logsModel) updateMainContent() {
 
 	lines := []components.ViewRow{}
 	for _, l := range server.GetLogs() {
-		s := lipgloss.NewStyle()
+		var col lipgloss.TerminalColor = lipgloss.NoColor{}
 		switch {
 		case l.Log.SeverityNumber >= logs.SeverityNumber_SEVERITY_NUMBER_ERROR:
-			s = s.Foreground(components.ErrorColor)
+			col = components.ErrorColor
 		case l.Log.SeverityNumber >= logs.SeverityNumber_SEVERITY_NUMBER_WARN:
-			s = s.Foreground(components.WarnColor)
+			col = components.WarnColor
 		case l.Log.SeverityNumber >= logs.SeverityNumber_SEVERITY_NUMBER_INFO:
-			s = s.Foreground(components.InfoColor)
+			col = components.InfoColor
 		case l.Log.SeverityNumber >= logs.SeverityNumber_SEVERITY_NUMBER_DEBUG:
-			s = s.Foreground(components.DebugColor)
+			col = components.DebugColor
 		}
-		svc := "-"
-		for _, attr := range l.ResourceLogs.Resource.Attributes {
-			if attr.Key == string(semconv.ServiceNameKey) {
-				svc = utils.AnyToString(attr.Value)
-				break
-			}
-		}
+
 		buf.WriteString(nanoToString(l.Log.TimeUnixNano))
 		buf.WriteByte(' ')
-		buf.WriteString(svc)
+		buf.WriteString(resourceToServiceName(l.ResourceLogs.Resource))
 		buf.WriteByte(' ')
-		// only reset foreground (so row select works correctly)
-		buf.WriteString(strings.ReplaceAll(s.Render(lipgloss.PlaceHorizontal(3, lipgloss.Left, l.Log.SeverityText)), "\x1b[0m", "\x1b[39m"))
+		buf.WriteString(renderForeground(col, lipgloss.PlaceHorizontal(3, lipgloss.Left, l.Log.SeverityText)))
 		buf.WriteByte(' ')
 		buf.WriteString(utils.AnyToString(l.Log.Body))
 		str := buf.String()
