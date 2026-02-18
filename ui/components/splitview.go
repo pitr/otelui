@@ -126,18 +126,15 @@ func (m Splitview[T, B]) Update(msg tea.Msg) (Splitview[T, B], tea.Cmd) {
 			top = false
 		}
 
-		switch {
-		case leftClick:
+		if leftClick {
 			m.top.SetFocus(top)
 			m.bot.SetFocus(!top)
-			fallthrough
-		default:
-			if inside {
-				if top {
-					cmd = m.top.Update(msg)
-				} else {
-					cmd = m.bot.Update(msg)
-				}
+		}
+		if inside {
+			if top {
+				cmd = m.top.Update(msg)
+			} else {
+				cmd = m.bot.Update(msg)
 			}
 		}
 	default:
