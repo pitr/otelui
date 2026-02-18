@@ -32,6 +32,11 @@ func (m metricsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case refreshMsg:
+		if msg.reset {
+			m.lastMetrics = -1
+		}
+		m.updateMainContent()
 	case server.ConsumeEvent:
 		if m.lastMetrics != msg.Metrics {
 			m.lastMetrics = msg.Metrics

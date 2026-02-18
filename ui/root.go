@@ -53,7 +53,7 @@ func newRootModel() tea.Model {
 			Next:  key.NewBinding(key.WithKeys("]"), key.WithHelp("[ ]", "switch mode")),
 			Prev:  key.NewBinding(key.WithKeys("[")),
 			Quit:  key.NewBinding(key.WithKeys("ctrl+c", "q")),
-			TZ:    key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "toggle UTC/local")),
+			TZ:    key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "UTC/local")),
 			Reset: key.NewBinding(key.WithKeys("ctrl+r"), key.WithHelp("ctrl+r", "reset")),
 		},
 		help: help.New(),
@@ -136,13 +136,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keyMap.TZ):
 			tzUTC = !tzUTC
 			components.TZUTC = tzUTC
+			for k, v := range m.models {
+				m.models[k], cmd = v.Update(refreshMsg{})
+				cmds = append(cmds, cmd)
+			}
+			cmd = tea.Batch(cmds...)
 		case key.Matches(msg, m.keyMap.Reset):
 			server.Reset()
 			m.ce = server.ConsumeEvent{}
 			m.statuses = nil
-			empty := server.ConsumeEvent{}
 			for k, v := range m.models {
-				m.models[k], cmd = v.Update(empty)
+				m.models[k], cmd = v.Update(refreshMsg{reset: true})
 				cmds = append(cmds, cmd)
 			}
 			cmd = tea.Batch(cmds...)
@@ -159,10 +163,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	defer func(start time.Time) { slog.Debug(fmt.Sprintf("View() %s", time.Since(start))) }(time.Now())
 
-	tz := "local"
-	if tzUTC {
-		tz = "UTC"
-	}
 	status := "waiting for data..."
 	if len(m.statuses) > 0 {
 		statusfmt := []string{"logs", "spans", "metrics", "payloads"}
@@ -174,8 +174,6 @@ func (m model) View() string {
 		}
 		status = fmt.Sprintf(strings.Join(statusfmt, " "), m.statuses...)
 	}
-	status += " tz=" + tz
-
 	keys := []key.Binding{m.keyMap.TZ, m.keyMap.Reset, m.keyMap.Next}
 	if m, ok := m.models[m.mode].(components.Helpful); ok {
 		keys = append(m.Help(), keys...)

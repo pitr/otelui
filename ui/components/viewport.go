@@ -172,6 +172,14 @@ func (v *Viewport) SetContent(lines []ViewRow) {
 		v.scrollTo(len(v.lines) - 1)
 	} else {
 		v.scrollTo(v.selected)
+		if v.onSelect == nil {
+			return
+		}
+		if len(v.lines) > 0 && v.selected >= 0 {
+			v.onSelect(v.lines[v.selected])
+		} else {
+			v.onSelect(ViewRow{})
+		}
 	}
 }
 

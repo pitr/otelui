@@ -44,7 +44,7 @@ func nanoToString(nsec uint64) string {
 	if tzUTC {
 		t = t.UTC()
 	}
-	return t.Format("2006-01-02T15:04:05.000000000")
+	return t.Format("2006-01-02T15:04:05.000000000Z07:00")
 }
 
 // treeTrim removes leading tree structure produced by lipgloss/tree, used for yanking

@@ -9,6 +9,8 @@ import (
 	"github.com/pitr/otelui/server"
 )
 
+type refreshMsg struct{ reset bool }
+
 func Run(ctx context.Context, cancel context.CancelFunc) {
 	prog := tea.NewProgram(
 		newRootModel(),

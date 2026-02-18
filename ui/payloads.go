@@ -40,6 +40,11 @@ func (m payloadsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case refreshMsg:
+		if msg.reset {
+			m.lastPayloads = 0
+		}
+		m.updateMainContent()
 	case server.ConsumeEvent:
 		if m.lastPayloads != msg.Payloads {
 			m.lastPayloads = msg.Payloads

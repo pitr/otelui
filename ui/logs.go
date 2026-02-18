@@ -41,6 +41,11 @@ func (m logsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case refreshMsg:
+		if msg.reset {
+			m.lastLogs = 0
+		}
+		m.updateMainContent()
 	case server.ConsumeEvent:
 		if m.lastLogs != msg.Logs {
 			m.lastLogs = msg.Logs
