@@ -53,6 +53,16 @@ type ConsumeEvent struct {
 
 var Send func(msg any)
 
+func Reset() {
+	Storage.Lock()
+	defer Storage.Unlock()
+	Storage.logs = []*Log{}
+	Storage.payloads = []*Payload{}
+	Storage.metrics = map[string]*Datapoints{}
+	Storage.spansReceived = 0
+	Storage.metricsReceived = 0
+}
+
 func setupStorage() {
 	Storage.logs = []*Log{}
 	Storage.payloads = []*Payload{}

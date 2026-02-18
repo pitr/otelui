@@ -28,10 +28,11 @@ const (
 )
 
 type keyMapRoot struct {
-	Next key.Binding
-	Prev key.Binding
-	Quit key.Binding
-	TZ   key.Binding
+	Next  key.Binding
+	Prev  key.Binding
+	Quit  key.Binding
+	TZ    key.Binding
+	Reset key.Binding
 }
 
 type model struct {
@@ -49,10 +50,11 @@ type model struct {
 func newRootModel() tea.Model {
 	return &model{
 		keyMap: keyMapRoot{
-			Next: key.NewBinding(key.WithKeys("]"), key.WithHelp("[ ]", "switch mode")),
-			Prev: key.NewBinding(key.WithKeys("[")),
-			Quit: key.NewBinding(key.WithKeys("ctrl+c", "q")),
-			TZ:   key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "toggle UTC/local")),
+			Next:  key.NewBinding(key.WithKeys("]"), key.WithHelp("[ ]", "switch mode")),
+			Prev:  key.NewBinding(key.WithKeys("[")),
+			Quit:  key.NewBinding(key.WithKeys("ctrl+c", "q")),
+			TZ:    key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "toggle UTC/local")),
+			Reset: key.NewBinding(key.WithKeys("ctrl+r"), key.WithHelp("ctrl+r", "reset")),
 		},
 		help: help.New(),
 		models: map[mRoot]tea.Model{
@@ -134,6 +136,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keyMap.TZ):
 			tzUTC = !tzUTC
 			components.TZUTC = tzUTC
+		case key.Matches(msg, m.keyMap.Reset):
+			server.Reset()
+			m.ce = server.ConsumeEvent{}
+			m.statuses = nil
+			empty := server.ConsumeEvent{}
+			for k, v := range m.models {
+				m.models[k], cmd = v.Update(empty)
+				cmds = append(cmds, cmd)
+			}
+			cmd = tea.Batch(cmds...)
 		default:
 			m.models[m.mode], cmd = m.models[m.mode].Update(msg)
 		}
@@ -164,7 +176,7 @@ func (m model) View() string {
 	}
 	status += " tz=" + tz
 
-	keys := []key.Binding{m.keyMap.TZ, m.keyMap.Next}
+	keys := []key.Binding{m.keyMap.TZ, m.keyMap.Reset, m.keyMap.Next}
 	if m, ok := m.models[m.mode].(components.Helpful); ok {
 		keys = append(m.Help(), keys...)
 	}

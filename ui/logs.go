@@ -100,7 +100,7 @@ func (m *logsModel) updateMainContent() {
 }
 
 func (m *logsModel) updateDetailsContent(selected components.ViewRow) {
-	selectedLog := selected.Raw.(*server.Log)
+	selectedLog, _ := selected.Raw.(*server.Log)
 	if selectedLog == nil {
 		m.view.Bot().SetContent([]components.ViewRow{})
 		return

@@ -74,7 +74,11 @@ func (m *payloadsModel) updateMainContent() {
 }
 
 func (m *payloadsModel) updateDetailsContent(selected components.ViewRow) {
-	row := selected.Raw.(*server.Payload)
+	row, _ := selected.Raw.(*server.Payload)
+	if row == nil {
+		m.view.Bot().SetContent([]components.ViewRow{})
+		return
+	}
 	lines := []components.ViewRow{}
 	switch p := row.Payload.(type) {
 	case []*logs.ResourceLogs:

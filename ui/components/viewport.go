@@ -201,6 +201,8 @@ func (v *Viewport) scrollTo(s int) {
 	}
 	if len(v.lines) > 0 && v.onSelect != nil {
 		v.onSelect(v.lines[v.selected])
+	} else if v.onSelect != nil {
+		v.onSelect(ViewRow{})
 	}
 }
 

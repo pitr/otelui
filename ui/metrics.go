@@ -63,6 +63,6 @@ func (m *metricsModel) updateMainContent() {
 }
 
 func (m *metricsModel) updateDetailsContent(selected components.ViewRow) {
-	metric := selected.Raw.(string)
+	metric, _ := selected.Raw.(string)
 	m.view.Bot().SetContent(metric)
 }
