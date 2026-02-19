@@ -63,7 +63,7 @@ func newTracesModel(title string) tea.Model {
 
 func (m *tracesModel) Init() tea.Cmd { return nil }
 func (m *tracesModel) Help() []key.Binding {
-	return append(m.views[m.focus].Help(), m.keyMap.Increase, m.keyMap.Next)
+	return append([]key.Binding{m.keyMap.Next, m.keyMap.Increase}, m.views[m.focus].Help()...)
 }
 func (m *tracesModel) View() string {
 	return lipgloss.JoinVertical(lipgloss.Left, m.views[0].View(), m.views[1].View(), m.views[2].View())

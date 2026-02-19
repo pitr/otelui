@@ -132,9 +132,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	defer func(start time.Time) { slog.Debug(fmt.Sprintf("View() %s", time.Since(start))) }(time.Now())
 
-	keys := []key.Binding{m.keyMap.TZ, m.keyMap.Reset, m.keyMap.Next}
+	keys := []key.Binding{m.keyMap.Next, m.keyMap.Reset, m.keyMap.TZ}
 	if h, ok := m.models[m.mode].(components.Helpful); ok {
-		keys = append(h.Help(), keys...)
+		keys = append(keys, h.Help()...)
 	}
 	m.help.Width = m.w
 	return m.models[m.mode].View() + "\n " + m.help.ShortHelpView(keys)

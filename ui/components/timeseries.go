@@ -33,12 +33,18 @@ func NewTimeseries(title string) *Timeseries {
 	}
 }
 
-func (t Timeseries) Help() []key.Binding {
-	return []key.Binding{}
-}
+func (t Timeseries) Help() []key.Binding     { return []key.Binding{} }
+func (t Timeseries) Init() tea.Cmd           { return nil }
+func (t *Timeseries) SetContent(name string) { t.name = name }
+func (t Timeseries) IsFocused() bool         { return t.isFocused }
 
-func (t Timeseries) Init() tea.Cmd {
-	return nil
+func (t *Timeseries) SetFocus(b bool) {
+	t.isFocused = b
+	if b {
+		t.model.AxisStyle = lipgloss.NewStyle().Foreground(AccentColor)
+	} else {
+		t.model.AxisStyle = lipgloss.NewStyle()
+	}
 }
 
 func (t *Timeseries) Update(msg tea.Msg) (cmd tea.Cmd) {
@@ -81,21 +87,4 @@ func (t *Timeseries) View() string {
 	}
 	t.model.DrawAll()
 	return t.model.View()
-}
-
-func (t *Timeseries) SetContent(name string) {
-	t.name = name
-}
-
-func (t Timeseries) IsFocused() bool {
-	return t.isFocused
-}
-
-func (t *Timeseries) SetFocus(b bool) {
-	t.isFocused = b
-	if b {
-		t.model.AxisStyle = lipgloss.NewStyle().Foreground(AccentColor)
-	} else {
-		t.model.AxisStyle = lipgloss.NewStyle()
-	}
 }

@@ -168,11 +168,11 @@ func (m *Splitview[T, B]) Top() T { return m.top }
 func (m *Splitview[T, B]) Bot() B { return m.bot }
 
 func (m Splitview[T, B]) Help() []key.Binding {
-	keys := []key.Binding{m.keyMap.Increase, m.keyMap.Next}
+	keys := []key.Binding{m.keyMap.Next, m.keyMap.Increase}
 	if m.top.IsFocused() {
-		keys = append(m.top.Help(), keys...)
+		keys = append(keys, m.top.Help()...)
 	} else {
-		keys = append(m.bot.Help(), keys...)
+		keys = append(keys, m.bot.Help()...)
 	}
 	return keys
 }
