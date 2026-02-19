@@ -41,7 +41,7 @@ type tracesModel struct {
 	keyMap    keyMapTraces
 }
 
-func newTracesModel() tea.Model {
+func newTracesModel(title string) tea.Model {
 	m := &tracesModel{
 		keyMap: keyMapTraces{
 			Increase: key.NewBinding(key.WithKeys("="), key.WithHelp("- =", "resize")),
@@ -53,7 +53,7 @@ func newTracesModel() tea.Model {
 		},
 	}
 	m.views = [3]*components.Viewport{
-		components.NewViewport("Traces", m.updateSpanTree),
+		components.NewViewport(title, m.updateSpanTree),
 		components.NewViewport("Spans", m.updateSpanDetails),
 		components.NewViewport("Details", nil),
 	}
@@ -61,8 +61,12 @@ func newTracesModel() tea.Model {
 	return m
 }
 
-func (m *tracesModel) Init() tea.Cmd {
-	return nil
+func (m *tracesModel) Init() tea.Cmd { return nil }
+func (m *tracesModel) Help() []key.Binding {
+	return append(m.views[m.focus].Help(), m.keyMap.Increase, m.keyMap.Next)
+}
+func (m *tracesModel) View() string {
+	return lipgloss.JoinVertical(lipgloss.Left, m.views[0].View(), m.views[1].View(), m.views[2].View())
 }
 
 func (m *tracesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -138,14 +142,6 @@ func (m *tracesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
-}
-
-func (m *tracesModel) View() string {
-	return lipgloss.JoinVertical(lipgloss.Left, m.views[0].View(), m.views[1].View(), m.views[2].View())
-}
-
-func (m *tracesModel) Help() []key.Binding {
-	return append(m.views[m.focus].Help(), m.keyMap.Increase, m.keyMap.Next)
 }
 
 func (m *tracesModel) setFocus(pane int) {

@@ -32,11 +32,10 @@ type Viewport struct {
 
 	onSelect func(ViewRow)
 
-	w, h       int
-	_border    lipgloss.Border
-	_focused   lipgloss.Style
-	_unfocused lipgloss.Style
-	_selected  lipgloss.Style
+	w, h      int
+	_border   lipgloss.Border
+	_focused  lipgloss.TerminalColor
+	_selected lipgloss.Style
 
 	keyMap keysViewport
 
@@ -61,20 +60,16 @@ func NewViewport(title string, onselect func(ViewRow)) *Viewport {
 			Left:   key.NewBinding(key.WithKeys("left")),
 			Right:  key.NewBinding(key.WithKeys("right")),
 		},
-		_border:    lipgloss.RoundedBorder(),
-		_focused:   lipgloss.NewStyle().BorderForeground(AccentColor),
-		_unfocused: lipgloss.NewStyle(),
-		_selected:  lipgloss.NewStyle().Background(SelectionColor),
+		_border:   lipgloss.RoundedBorder(),
+		_focused:  AccentColor,
+		_selected: lipgloss.NewStyle().Background(SelectionColor),
 	}
 }
 
-func (v Viewport) Help() []key.Binding {
-	return []key.Binding{v.keyMap.Yank}
-}
-
-func (v Viewport) Init() tea.Cmd {
-	return nil
-}
+func (v Viewport) Init() tea.Cmd       { return nil }
+func (v Viewport) Help() []key.Binding { return []key.Binding{v.keyMap.Yank} }
+func (v Viewport) IsFocused() bool     { return v.isFocused }
+func (v *Viewport) SetFocus(b bool)    { v.isFocused = b }
 
 func (v *Viewport) Update(msg tea.Msg) tea.Cmd {
 	var cmd tea.Cmd
@@ -124,43 +119,23 @@ func (v *Viewport) Update(msg tea.Msg) tea.Cmd {
 }
 
 func (v *Viewport) View() string {
-	s := v._unfocused
+	bs := lipgloss.NewStyle().Border(v._border, false, false, false, true)
+	fg := lipgloss.NewStyle()
 	if v.isFocused {
-		s = v._focused
+		bs = bs.BorderForeground(v._focused)
+		fg = fg.Foreground(v._focused)
 	}
-	s = s.Border(v._border, true, false, false, true)
 	lines := v.visibleLines()
-	return strings.Replace(
-		lipgloss.JoinHorizontal(
-			lipgloss.Top,
-			lipgloss.JoinVertical(
-				lipgloss.Left,
-				s.Render(lipgloss.NewStyle().
-					Width(v.w).MaxWidth(v.w).
-					Height(v.h).MaxHeight(v.h).
-					Render(strings.Join(lines, "\n"))),
-				Scrollbar(
-					s,
-					ScrollbarHorizontal,
-					v.w,
-					v.longestLineWidth,
-					v.w,
-					v.xOffset,
-				),
-			),
-			Scrollbar(
-				s,
-				ScrollbarVertical,
-				v.h,
-				len(v.lines),
-				len(lines),
-				v.yOffset,
-			),
-		),
-		strings.Repeat(v._border.Top, lipgloss.Width(v.title)+3),
-		v._border.Top+" "+v.title+" ",
-		1,
-	)
+	hscroll := Scrollbar(bs, ScrollbarHorizontal, v.w, v.longestLineWidth, v.w, v.xOffset)
+	vscroll := Scrollbar(bs, ScrollbarVertical, v.h, len(v.lines), len(lines), v.yOffset)
+	content := bs.Render(lipgloss.NewStyle().
+		Width(v.w).MaxWidth(v.w).
+		Height(v.h).MaxHeight(v.h).
+		Render(strings.Join(lines, "\n")))
+	top := fg.Render(v._border.TopLeft+v._border.Top, v.title+" ")
+	top += fg.Render(strings.Repeat(v._border.Top, max(0, v.w+1-lipgloss.Width(top))))
+
+	return lipgloss.JoinHorizontal(lipgloss.Top, lipgloss.JoinVertical(lipgloss.Left, top, content, hscroll), vscroll)
 }
 
 func (v *Viewport) SetContent(lines []ViewRow) {
@@ -187,14 +162,6 @@ func (v *Viewport) AddContent(lines []ViewRow) {
 	v.lines = append(v.lines, lines...)
 	v.longestLineWidth = max(v.longestLineWidth, v.findLongestLineWidth(lines))
 	v.scrollTo(v.selected)
-}
-
-func (v Viewport) IsFocused() bool {
-	return v.isFocused
-}
-
-func (v *Viewport) SetFocus(b bool) {
-	v.isFocused = b
 }
 
 func (v *Viewport) scrollTo(s int) {

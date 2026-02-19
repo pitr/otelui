@@ -15,18 +15,18 @@ type metricsModel struct {
 	lastMetrics int
 }
 
-func newMetricsModel() tea.Model {
+func newMetricsModel(title string) tea.Model {
 	m := metricsModel{lastMetrics: -1}
 	m.view = components.NewSplitview(
-		components.NewViewport("Metrics", m.updateDetailsContent),
+		components.NewViewport(title, m.updateDetailsContent),
 		components.NewTimeseries("Details"),
 	)
 	return m
 }
 
-func (m metricsModel) Init() tea.Cmd {
-	return nil
-}
+func (m metricsModel) Init() tea.Cmd       { return nil }
+func (m metricsModel) View() string        { return m.view.View() }
+func (m metricsModel) Help() []key.Binding { return m.view.Help() }
 
 func (m metricsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
@@ -47,14 +47,6 @@ func (m metricsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	return m, cmd
-}
-
-func (m metricsModel) View() string {
-	return m.view.View()
-}
-
-func (m metricsModel) Help() []key.Binding {
-	return m.view.Help()
 }
 
 func (m *metricsModel) updateMainContent() {

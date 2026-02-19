@@ -23,18 +23,18 @@ type payloadsModel struct {
 	lastPayloads int
 }
 
-func newPayloadsModel() tea.Model {
+func newPayloadsModel(title string) tea.Model {
 	m := payloadsModel{}
 	m.view = components.NewSplitview(
-		components.NewViewport("Payloads", m.updateDetailsContent),
+		components.NewViewport(title, m.updateDetailsContent),
 		components.NewViewport("Details", nil),
 	)
 	return m
 }
 
-func (m payloadsModel) Init() tea.Cmd {
-	return nil
-}
+func (m payloadsModel) Init() tea.Cmd       { return nil }
+func (m payloadsModel) Help() []key.Binding { return m.view.Help() }
+func (m payloadsModel) View() string        { return m.view.View() }
 
 func (m payloadsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
@@ -54,10 +54,6 @@ func (m payloadsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.view, cmd = m.view.Update(msg)
 	}
 	return m, cmd
-}
-
-func (m payloadsModel) View() string {
-	return m.view.View()
 }
 
 func (m *payloadsModel) updateMainContent() {
@@ -294,8 +290,4 @@ func (m *payloadsModel) updateDetailsContent(selected components.ViewRow) {
 		}
 	}
 	m.view.Bot().SetContent(lines)
-}
-
-func (m payloadsModel) Help() []key.Binding {
-	return m.view.Help()
 }

@@ -3,7 +3,6 @@ package ui
 import (
 	"fmt"
 	"log/slog"
-	"strconv"
 	"strings"
 	"time"
 
@@ -39,15 +38,13 @@ type model struct {
 	keyMap keyMapRoot
 	help   help.Model
 
-	mode      mRoot
-	w         int
-	models    map[mRoot]tea.Model
-	_selected lipgloss.Style
-	ce        server.ConsumeEvent
-	statuses  []any
+	mode   mRoot
+	w      int
+	models map[mRoot]tea.Model
 }
 
 func newRootModel() tea.Model {
+	names := []string{"Logs", "Traces", "Metrics", "Payloads"}
 	return &model{
 		keyMap: keyMapRoot{
 			Next:  key.NewBinding(key.WithKeys("]"), key.WithHelp("[ ]", "switch mode")),
@@ -58,18 +55,15 @@ func newRootModel() tea.Model {
 		},
 		help: help.New(),
 		models: map[mRoot]tea.Model{
-			mRootLogs:     newLogsModel(),
-			mRootTraces:   newTracesModel(),
-			mRootMetrics:  newMetricsModel(),
-			mRootPayloads: newPayloadsModel(),
+			mRootLogs:     newLogsModel(rootTabTitle(names, mRootLogs)),
+			mRootTraces:   newTracesModel(rootTabTitle(names, mRootTraces)),
+			mRootMetrics:  newMetricsModel(rootTabTitle(names, mRootMetrics)),
+			mRootPayloads: newPayloadsModel(rootTabTitle(names, mRootPayloads)),
 		},
-		_selected: lipgloss.NewStyle().Background(components.SelectionColor).Bold(true),
 	}
 }
 
-func (m model) Init() tea.Cmd {
-	return nil
-}
+func (m model) Init() tea.Cmd { return nil }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
@@ -84,29 +78,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case server.ConsumeEvent:
-		payloadsStyle := lipgloss.NewStyle()
-		logsStyle := lipgloss.NewStyle()
-		spansStyle := lipgloss.NewStyle()
-		metricsStyle := lipgloss.NewStyle()
-		if msg.Payloads != m.ce.Payloads {
-			payloadsStyle = payloadsStyle.Background(components.SelectionColor)
-		}
-		if msg.Logs != m.ce.Logs {
-			logsStyle = logsStyle.Background(components.SelectionColor)
-		}
-		if msg.Spans != m.ce.Spans {
-			spansStyle = spansStyle.Background(components.SelectionColor)
-		}
-		if msg.Metrics != m.ce.Metrics {
-			metricsStyle = metricsStyle.Background(components.SelectionColor)
-		}
-		m.statuses = []any{
-			logsStyle.Render(strconv.Itoa(msg.Logs)),
-			spansStyle.Render(strconv.Itoa(msg.Spans)),
-			metricsStyle.Render(strconv.Itoa(msg.Metrics)),
-			payloadsStyle.Render(strconv.Itoa(msg.Payloads)),
-		}
-		m.ce = msg
 		for k, v := range m.models {
 			m.models[k], cmd = v.Update(msg)
 			cmds = append(cmds, cmd)
@@ -143,8 +114,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmd = tea.Batch(cmds...)
 		case key.Matches(msg, m.keyMap.Reset):
 			server.Reset()
-			m.ce = server.ConsumeEvent{}
-			m.statuses = nil
 			for k, v := range m.models {
 				m.models[k], cmd = v.Update(refreshMsg{reset: true})
 				cmds = append(cmds, cmd)
@@ -163,27 +132,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	defer func(start time.Time) { slog.Debug(fmt.Sprintf("View() %s", time.Since(start))) }(time.Now())
 
-	status := "waiting for data..."
-	if len(m.statuses) > 0 {
-		statusfmt := []string{"logs", "spans", "metrics", "payloads"}
-		for i, s := range statusfmt {
-			if i == int(m.mode) {
-				s = lipgloss.NewStyle().Bold(true).Render(strings.ToUpper(s))
-			}
-			statusfmt[i] = s + "=%s"
-		}
-		status = fmt.Sprintf(strings.Join(statusfmt, " "), m.statuses...)
-	}
 	keys := []key.Binding{m.keyMap.TZ, m.keyMap.Reset, m.keyMap.Next}
-	if m, ok := m.models[m.mode].(components.Helpful); ok {
-		keys = append(m.Help(), keys...)
+	if h, ok := m.models[m.mode].(components.Helpful); ok {
+		keys = append(h.Help(), keys...)
 	}
+	m.help.Width = m.w
+	return m.models[m.mode].View() + "\n " + m.help.ShortHelpView(keys)
+}
 
-	m.help.Width = m.w - lipgloss.Width(status) - 3
-	help := m.help.ShortHelpView(keys)
-
-	gap := strings.Repeat(" ", max(0, m.w-lipgloss.Width(help+status)))
-	header := status + gap + help
-
-	return header + "\n" + m.models[m.mode].View()
+func rootTabTitle(names []string, m mRoot) string {
+	s := lipgloss.NewStyle().Foreground(components.AccentColor)
+	parts := make([]string, len(names))
+	for i, name := range names {
+		if mRoot(i) == m {
+			parts[i] = s.Render(name)
+		} else {
+			parts[i] = "\033[0m" + name
+		}
+	}
+	return strings.Join(parts, " ")
 }

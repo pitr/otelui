@@ -48,23 +48,6 @@ func (t *Timeseries) Update(msg tea.Msg) (cmd tea.Cmd) {
 		t.h = msg.Height
 		t.model.Resize(t.w, t.h)
 		t.model.Focus()
-		// case tea.KeyMsg:
-	// switch {
-	// case key.Matches(msg, v.keyMap.Left):
-	// v.xOffset = max(v.xOffset-1, 0)
-	// case key.Matches(msg, v.keyMap.Right):
-	// v.xOffset = min(v.xOffset+1, v.longestLineWidth-v.w)
-	// }
-	// case tea.MouseMsg:
-	// if msg.Action != tea.MouseActionPress {
-	// 	break
-	// }
-	// switch msg.Button {
-	// case tea.MouseButtonWheelLeft:
-	// 	v.xOffset = max(v.xOffset-1, 0)
-	// case tea.MouseButtonWheelRight:
-	// 	v.xOffset = min(v.xOffset+1, v.longestLineWidth-v.w)
-	// }
 	default:
 		t.model, cmd = t.model.Update(msg)
 	}
@@ -74,7 +57,7 @@ func (t *Timeseries) Update(msg tea.Msg) (cmd tea.Cmd) {
 
 func (t *Timeseries) View() string {
 	if t.name == "" {
-		return ""
+		return lipgloss.NewStyle().Width(t.w).Height(t.h).Render("")
 	}
 	if TZUTC {
 		t.model.XLabelFormatter = func(_ int, v float64) string {
@@ -91,7 +74,7 @@ func (t *Timeseries) View() string {
 	t.model.SetYRange(0, 1)
 	dps := server.GetDatapoints(t.name)
 	if dps == nil {
-		return ""
+		return lipgloss.NewStyle().Width(t.w).Height(t.h).Render("")
 	}
 	for i, ts := range dps.Times {
 		t.model.Push(timeserieslinechart.TimePoint{Time: time.Unix(0, int64(ts)), Value: dps.Values[i]})

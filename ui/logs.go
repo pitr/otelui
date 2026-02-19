@@ -23,18 +23,18 @@ type logsModel struct {
 	lastLogs int
 }
 
-func newLogsModel() tea.Model {
+func newLogsModel(title string) tea.Model {
 	m := logsModel{}
 	m.view = components.NewSplitview(
-		components.NewViewport("Logs", m.updateDetailsContent),
+		components.NewViewport(title, m.updateDetailsContent),
 		components.NewViewport("Details", nil),
 	)
 	return m
 }
 
-func (m logsModel) Init() tea.Cmd {
-	return nil
-}
+func (m logsModel) Init() tea.Cmd       { return nil }
+func (m logsModel) Help() []key.Binding { return m.view.Help() }
+func (m logsModel) View() string        { return m.view.View() }
 
 func (m logsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
@@ -55,14 +55,6 @@ func (m logsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	return m, cmd
-}
-
-func (m logsModel) View() string {
-	return m.view.View()
-}
-
-func (m logsModel) Help() []key.Binding {
-	return m.view.Help()
 }
 
 func (m *logsModel) updateMainContent() {
