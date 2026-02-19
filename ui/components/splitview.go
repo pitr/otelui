@@ -28,6 +28,8 @@ type keysSplitview struct {
 	Decrease key.Binding
 	Next     key.Binding
 	Prev     key.Binding
+	Enter    key.Binding
+	Esc      key.Binding
 }
 
 type Splitview[T SplitableModel[T], B SplitableModel[B]] struct {
@@ -52,6 +54,8 @@ func NewSplitview[T SplitableModel[T], B SplitableModel[B]](top T, bot B) Splitv
 			Decrease: key.NewBinding(key.WithKeys("-")),
 			Next:     key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "switch pane")),
 			Prev:     key.NewBinding(key.WithKeys("shift+tab")),
+			Enter:    key.NewBinding(key.WithKeys("enter")),
+			Esc:      key.NewBinding(key.WithKeys("esc")),
 		},
 	}
 }
@@ -101,6 +105,10 @@ func (m Splitview[T, B]) Update(msg tea.Msg) (Splitview[T, B], tea.Cmd) {
 				)
 			}
 		case key.Matches(msg, m.keyMap.Next, m.keyMap.Prev):
+			fallthrough
+		case key.Matches(msg, m.keyMap.Enter) && m.top.IsFocused():
+			fallthrough
+		case key.Matches(msg, m.keyMap.Esc) && m.bot.IsFocused():
 			m.top.SetFocus(!m.top.IsFocused())
 			m.bot.SetFocus(!m.bot.IsFocused())
 		default:

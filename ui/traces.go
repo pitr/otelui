@@ -28,6 +28,8 @@ type keyMapTraces struct {
 	Decrease key.Binding
 	Next     key.Binding
 	Prev     key.Binding
+	Enter    key.Binding
+	Esc      key.Binding
 }
 
 type tracesModel struct {
@@ -46,6 +48,8 @@ func newTracesModel() tea.Model {
 			Decrease: key.NewBinding(key.WithKeys("-")),
 			Next:     key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "switch pane")),
 			Prev:     key.NewBinding(key.WithKeys("shift+tab")),
+			Enter:    key.NewBinding(key.WithKeys("enter")),
+			Esc:      key.NewBinding(key.WithKeys("esc")),
 		},
 	}
 	m.views = [3]*components.Viewport{
@@ -86,6 +90,10 @@ func (m *tracesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.setFocus((m.focus + 1) % 3)
 		case key.Matches(msg, m.keyMap.Prev):
 			m.setFocus((m.focus + 2) % 3)
+		case key.Matches(msg, m.keyMap.Enter) && m.focus < 2:
+			m.setFocus(m.focus + 1)
+		case key.Matches(msg, m.keyMap.Esc) && m.focus > 0:
+			m.setFocus(m.focus - 1)
 		case key.Matches(msg, m.keyMap.Increase):
 			other := (m.focus + 1) % 3
 			if m.h[other] >= traceMinPane+tracePaneStep {
