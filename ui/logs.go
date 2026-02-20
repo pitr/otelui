@@ -26,8 +26,8 @@ type logsModel struct {
 func newLogsModel(title string) tea.Model {
 	m := logsModel{}
 	m.view = components.NewSplitview(
-		components.NewViewport(title, m.updateDetailsContent).WithSearch(),
-		components.NewViewport("Details", nil),
+		components.NewViewport(title).WithSelectFunc(m.updateDetailsContent).WithSearch(),
+		components.NewViewport("Details"),
 	)
 	return m
 }

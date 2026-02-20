@@ -18,7 +18,7 @@ type metricsModel struct {
 func newMetricsModel(title string) tea.Model {
 	m := metricsModel{lastMetrics: -1}
 	m.view = components.NewSplitview(
-		components.NewViewport(title, m.updateDetailsContent).WithSearch(),
+		components.NewViewport(title).WithSelectFunc(m.updateDetailsContent).WithSearch(),
 		components.NewTimeseries("Details"),
 	)
 	return m

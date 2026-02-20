@@ -59,10 +59,9 @@ type Viewport struct {
 	searchFilter string
 }
 
-func NewViewport(title string, onselect func(ViewRow)) *Viewport {
+func NewViewport(title string) *Viewport {
 	return &Viewport{
 		title:    title,
-		onSelect: onselect,
 		selected: -1,
 		keyMap: keysViewport{
 			Yank:   key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "copy")),
@@ -82,6 +81,11 @@ func NewViewport(title string, onselect func(ViewRow)) *Viewport {
 }
 
 func (v Viewport) Init() tea.Cmd { return nil }
+
+func (v *Viewport) WithSelectFunc(f func(ViewRow)) *Viewport {
+	v.onSelect = f
+	return v
+}
 
 func (v *Viewport) WithSearch() *Viewport {
 	v.searchable = true

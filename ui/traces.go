@@ -53,9 +53,9 @@ func newTracesModel(title string) tea.Model {
 		},
 	}
 	m.views = [3]*components.Viewport{
-		components.NewViewport(title, m.updateSpanTree).WithSearch(),
-		components.NewViewport("Spans", m.updateSpanDetails).WithSearch(),
-		components.NewViewport("Details", nil),
+		components.NewViewport(title).WithSelectFunc(m.updateSpanTree).WithSearch(),
+		components.NewViewport("Spans").WithSelectFunc(m.updateSpanDetails).WithSearch(),
+		components.NewViewport("Details"),
 	}
 	m.views[0].SetFocus(true)
 	return m
