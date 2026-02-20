@@ -55,6 +55,19 @@ func treeTrim(s string) string {
 	return strings.TrimLeft(s, " └├─│")
 }
 
+func attrsSearch(groups ...[]*v1.KeyValue) string {
+	var b strings.Builder
+	for _, kvs := range groups {
+		for _, a := range kvs {
+			b.WriteString(a.Key)
+			b.WriteByte('=')
+			b.WriteString(utils.AnyToString(a.Value))
+			b.WriteByte(' ')
+		}
+	}
+	return b.String()
+}
+
 func attrsToTree(name string, kvs []*v1.KeyValue) (t *tree.Tree, set bool) {
 	attrs := tree.Root(fmt.Sprintf("%s (%d):", name, len(kvs)))
 	for _, a := range kvs {

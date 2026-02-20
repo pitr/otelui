@@ -97,14 +97,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.models[m.mode], cmd = m.models[m.mode].Update(msg)
 		}
 	case tea.KeyMsg:
+		capturing := false
+		if ic, ok := m.models[m.mode].(components.InputCapture); ok {
+			capturing = ic.IsCapturingInput()
+		}
 		switch {
-		case key.Matches(msg, m.keyMap.Quit):
+		case key.Matches(msg, m.keyMap.Quit) && (!capturing || msg.String() == "ctrl+c"):
 			return m, tea.Quit
-		case key.Matches(msg, m.keyMap.Next):
+		case key.Matches(msg, m.keyMap.Next) && !capturing:
 			m.mode = (m.mode + 1) % mRoot(len(m.models))
-		case key.Matches(msg, m.keyMap.Prev):
+		case key.Matches(msg, m.keyMap.Prev) && !capturing:
 			m.mode = (m.mode - 1) % mRoot(len(m.models))
-		case key.Matches(msg, m.keyMap.TZ):
+		case key.Matches(msg, m.keyMap.TZ) && !capturing:
 			tzUTC = !tzUTC
 			components.TZUTC = tzUTC
 			for k, v := range m.models {

@@ -53,15 +53,17 @@ func newTracesModel(title string) tea.Model {
 		},
 	}
 	m.views = [3]*components.Viewport{
-		components.NewViewport(title, m.updateSpanTree),
-		components.NewViewport("Spans", m.updateSpanDetails),
+		components.NewViewport(title, m.updateSpanTree).WithSearch(),
+		components.NewViewport("Spans", m.updateSpanDetails).WithSearch(),
 		components.NewViewport("Details", nil),
 	}
 	m.views[0].SetFocus(true)
 	return m
 }
 
-func (m *tracesModel) Init() tea.Cmd { return nil }
+func (m *tracesModel) Init() tea.Cmd          { return nil }
+func (m *tracesModel) IsCapturingInput() bool { return m.views[m.focus].IsCapturingInput() }
+
 func (m *tracesModel) Help() []key.Binding {
 	return append([]key.Binding{m.keyMap.Next, m.keyMap.Increase}, m.views[m.focus].Help()...)
 }
@@ -89,23 +91,24 @@ func (m *tracesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.h[2] = total - m.h[0] - m.h[1]
 		m.resizeViewports()
 	case tea.KeyMsg:
+		capturing := m.views[m.focus].IsCapturingInput()
 		switch {
-		case key.Matches(msg, m.keyMap.Next):
+		case key.Matches(msg, m.keyMap.Next) && !capturing:
 			m.setFocus((m.focus + 1) % 3)
-		case key.Matches(msg, m.keyMap.Prev):
+		case key.Matches(msg, m.keyMap.Prev) && !capturing:
 			m.setFocus((m.focus + 2) % 3)
 		case key.Matches(msg, m.keyMap.Enter) && m.focus < 2:
 			m.setFocus(m.focus + 1)
-		case key.Matches(msg, m.keyMap.Esc) && m.focus > 0:
+		case key.Matches(msg, m.keyMap.Esc) && m.focus > 0 && !capturing:
 			m.setFocus(m.focus - 1)
-		case key.Matches(msg, m.keyMap.Increase):
+		case key.Matches(msg, m.keyMap.Increase) && !capturing:
 			other := (m.focus + 1) % 3
 			if m.h[other] >= traceMinPane+tracePaneStep {
 				m.h[other] -= tracePaneStep
 				m.h[m.focus] += tracePaneStep
 				m.resizeViewports()
 			}
-		case key.Matches(msg, m.keyMap.Decrease):
+		case key.Matches(msg, m.keyMap.Decrease) && !capturing:
 			other := (m.focus + 1) % 3
 			if m.h[m.focus] >= traceMinPane+tracePaneStep {
 				m.h[m.focus] -= tracePaneStep

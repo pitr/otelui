@@ -77,8 +77,14 @@ func (m Splitview[T, B]) Update(msg tea.Msg) (Splitview[T, B], tea.Cmd) {
 			m.bot.Update(tea.WindowSizeMsg{Width: m.w, Height: m.h[1]}),
 		)
 	case tea.KeyMsg:
+		capturing := false
+		if ic, ok := any(m.top).(InputCapture); ok && m.top.IsFocused() {
+			capturing = ic.IsCapturingInput()
+		} else if ic, ok := any(m.bot).(InputCapture); ok && m.bot.IsFocused() {
+			capturing = ic.IsCapturingInput()
+		}
 		switch {
-		case key.Matches(msg, m.keyMap.Increase):
+		case key.Matches(msg, m.keyMap.Increase) && !capturing:
 			i := 0
 			if m.bot.IsFocused() {
 				i = 1
@@ -91,7 +97,7 @@ func (m Splitview[T, B]) Update(msg tea.Msg) (Splitview[T, B], tea.Cmd) {
 					m.bot.Update(tea.WindowSizeMsg{Width: m.w, Height: m.h[1]}),
 				)
 			}
-		case key.Matches(msg, m.keyMap.Decrease):
+		case key.Matches(msg, m.keyMap.Decrease) && !capturing:
 			i := 0
 			if m.bot.IsFocused() {
 				i = 1

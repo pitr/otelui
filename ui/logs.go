@@ -26,15 +26,16 @@ type logsModel struct {
 func newLogsModel(title string) tea.Model {
 	m := logsModel{}
 	m.view = components.NewSplitview(
-		components.NewViewport(title, m.updateDetailsContent),
+		components.NewViewport(title, m.updateDetailsContent).WithSearch(),
 		components.NewViewport("Details", nil),
 	)
 	return m
 }
 
-func (m logsModel) Init() tea.Cmd       { return nil }
-func (m logsModel) Help() []key.Binding { return m.view.Help() }
-func (m logsModel) View() string        { return m.view.View() }
+func (m logsModel) Init() tea.Cmd          { return nil }
+func (m logsModel) Help() []key.Binding    { return m.view.Help() }
+func (m logsModel) View() string           { return m.view.View() }
+func (m logsModel) IsCapturingInput() bool { return m.view.Top().IsCapturingInput() }
 
 func (m logsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
@@ -82,7 +83,8 @@ func (m *logsModel) updateMainContent() {
 		buf.WriteByte(' ')
 		buf.WriteString(utils.AnyToString(l.Log.Body))
 		str := buf.String()
-		lines = append(lines, components.ViewRow{Str: str, Yank: ansi.Strip(str), Raw: l})
+		search := attrsSearch(l.Log.Attributes, l.ScopeLogs.Scope.Attributes, l.ResourceLogs.Resource.Attributes)
+		lines = append(lines, components.ViewRow{Str: str, Yank: ansi.Strip(str), Raw: l, Search: search})
 		buf.Reset()
 	}
 	m.view.Top().SetContent(lines)

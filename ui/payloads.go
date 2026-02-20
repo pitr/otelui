@@ -26,15 +26,16 @@ type payloadsModel struct {
 func newPayloadsModel(title string) tea.Model {
 	m := payloadsModel{}
 	m.view = components.NewSplitview(
-		components.NewViewport(title, m.updateDetailsContent),
+		components.NewViewport(title, m.updateDetailsContent).WithSearch(),
 		components.NewViewport("Details", nil),
 	)
 	return m
 }
 
-func (m payloadsModel) Init() tea.Cmd       { return nil }
-func (m payloadsModel) Help() []key.Binding { return m.view.Help() }
-func (m payloadsModel) View() string        { return m.view.View() }
+func (m payloadsModel) Init() tea.Cmd          { return nil }
+func (m payloadsModel) Help() []key.Binding    { return m.view.Help() }
+func (m payloadsModel) View() string           { return m.view.View() }
+func (m payloadsModel) IsCapturingInput() bool { return m.view.Top().IsCapturingInput() }
 
 func (m payloadsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
@@ -60,16 +61,49 @@ func (m *payloadsModel) updateMainContent() {
 	payloads := []components.ViewRow{}
 	for _, p := range server.GetPayloads() {
 		t := "unknown"
-		switch p.Payload.(type) {
+		var search strings.Builder
+		switch pp := p.Payload.(type) {
 		case []*logs.ResourceLogs:
 			t = "logs"
+			for _, rl := range pp {
+				search.WriteString(attrsSearch(rl.Resource.Attributes))
+				for _, sl := range rl.ScopeLogs {
+					search.WriteString(attrsSearch(sl.Scope.Attributes))
+					for _, lr := range sl.LogRecords {
+						search.WriteString(utils.AnyToString(lr.Body))
+						search.WriteByte(' ')
+						search.WriteString(attrsSearch(lr.Attributes))
+					}
+				}
+			}
 		case []*traces.ResourceSpans:
 			t = "spans"
+			for _, rs := range pp {
+				search.WriteString(attrsSearch(rs.Resource.Attributes))
+				for _, ss := range rs.ScopeSpans {
+					search.WriteString(attrsSearch(ss.Scope.Attributes))
+					for _, s := range ss.Spans {
+						search.WriteString(s.Name)
+						search.WriteByte(' ')
+						search.WriteString(attrsSearch(s.Attributes))
+					}
+				}
+			}
 		case []*metrics.ResourceMetrics:
 			t = "metrics"
+			for _, rm := range pp {
+				search.WriteString(attrsSearch(rm.Resource.Attributes))
+				for _, sm := range rm.ScopeMetrics {
+					search.WriteString(attrsSearch(sm.Scope.Attributes))
+					for _, metric := range sm.Metrics {
+						search.WriteString(metric.Name)
+						search.WriteByte(' ')
+					}
+				}
+			}
 		}
 		s := fmt.Sprintf("%s %3d %s", nanoToString(uint64(p.Received.UnixNano())), p.Num, t)
-		payloads = append(payloads, components.ViewRow{Str: s, Yank: s, Raw: p})
+		payloads = append(payloads, components.ViewRow{Str: s, Yank: s, Search: search.String(), Raw: p})
 	}
 	m.view.Top().SetContent(payloads)
 }
