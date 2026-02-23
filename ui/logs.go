@@ -13,9 +13,9 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	logs "go.opentelemetry.io/proto/otlp/logs/v1"
 
-	"github.com/pitr/otelui/server"
-	"github.com/pitr/otelui/ui/components"
-	"github.com/pitr/otelui/utils"
+	"pitr.ca/otelui/server"
+	"pitr.ca/otelui/ui/components"
+	"pitr.ca/otelui/utils"
 )
 
 type logsModel struct {

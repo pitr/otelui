@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/pitr/otelui/server"
+	"pitr.ca/otelui/server"
 )
 
 type refreshMsg struct{ reset bool }

@@ -8,7 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/pitr/otelui/server"
+	"pitr.ca/otelui/server"
 )
 
 var TZUTC bool

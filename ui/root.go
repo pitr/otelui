@@ -11,8 +11,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/pitr/otelui/server"
-	"github.com/pitr/otelui/ui/components"
+	"pitr.ca/otelui/server"
+	"pitr.ca/otelui/ui/components"
 )
 
 type mRoot uint

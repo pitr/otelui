@@ -1,4 +1,4 @@
-module github.com/pitr/otelui
+module pitr.ca/otelui
 
 go 1.25.2
 

@@ -7,8 +7,8 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/pitr/otelui/server"
-	"github.com/pitr/otelui/ui"
+	"pitr.ca/otelui/server"
+	"pitr.ca/otelui/ui"
 )
 
 func main() {

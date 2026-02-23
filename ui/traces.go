@@ -13,8 +13,8 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 
-	"github.com/pitr/otelui/server"
-	"github.com/pitr/otelui/ui/components"
+	"pitr.ca/otelui/server"
+	"pitr.ca/otelui/ui/components"
 )
 
 const (

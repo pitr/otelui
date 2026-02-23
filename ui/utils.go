@@ -13,7 +13,7 @@ import (
 	metrics "go.opentelemetry.io/proto/otlp/metrics/v1"
 	resource "go.opentelemetry.io/proto/otlp/resource/v1"
 
-	"github.com/pitr/otelui/utils"
+	"pitr.ca/otelui/utils"
 )
 
 func AnyToType(v *v1.AnyValue) string {

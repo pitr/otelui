@@ -12,9 +12,9 @@ import (
 	metrics "go.opentelemetry.io/proto/otlp/metrics/v1"
 	traces "go.opentelemetry.io/proto/otlp/trace/v1"
 
-	"github.com/pitr/otelui/server"
-	"github.com/pitr/otelui/ui/components"
-	"github.com/pitr/otelui/utils"
+	"pitr.ca/otelui/server"
+	"pitr.ca/otelui/ui/components"
+	"pitr.ca/otelui/utils"
 )
 
 type payloadsModel struct {

@@ -14,7 +14,7 @@ import (
 	resource "go.opentelemetry.io/proto/otlp/resource/v1"
 	traces "go.opentelemetry.io/proto/otlp/trace/v1"
 
-	"github.com/pitr/otelui/utils"
+	"pitr.ca/otelui/utils"
 )
 
 type Payload struct {
