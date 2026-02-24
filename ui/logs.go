@@ -10,7 +10,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/tree"
-	"github.com/charmbracelet/x/ansi"
 	logs "go.opentelemetry.io/proto/otlp/logs/v1"
 
 	"pitr.ca/otelui/server"
@@ -26,7 +25,7 @@ type logsModel struct {
 func newLogsModel(title string) tea.Model {
 	m := logsModel{}
 	m.view = components.NewSplitview(
-		components.NewViewport(title).WithSelectFunc(m.updateDetailsContent).WithSearch(),
+		components.NewViewport(title).WithSelectFunc(m.updateDetailsContent),
 		components.NewViewport("Details"),
 	)
 	return m
@@ -84,7 +83,7 @@ func (m *logsModel) updateMainContent() {
 		buf.WriteString(utils.AnyToString(l.Log.Body))
 		str := buf.String()
 		search := attrsSearch(l.Log.Attributes, l.ScopeLogs.Scope.Attributes, l.ResourceLogs.Resource.Attributes)
-		lines = append(lines, components.ViewRow{Str: str, Yank: ansi.Strip(str), Raw: l, Search: search})
+		lines = append(lines, components.ViewRow{Str: str, Raw: l, Search: search})
 		buf.Reset()
 	}
 	m.view.Top().SetContent(lines)
@@ -124,7 +123,7 @@ func (m *logsModel) updateDetailsContent(selected components.ViewRow) {
 	}
 	lines := []components.ViewRow{}
 	for l := range strings.SplitSeq(t.String(), "\n") {
-		lines = append(lines, components.ViewRow{Str: l, Yank: treeTrim(l)})
+		lines = append(lines, components.ViewRow{Str: l})
 	}
 	m.view.Bot().SetContent(lines)
 }

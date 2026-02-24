@@ -14,7 +14,7 @@ type refreshMsg struct{ reset bool }
 func Run(ctx context.Context, cancel context.CancelFunc) {
 	prog := tea.NewProgram(
 		newRootModel(),
-		tea.WithAltScreen(), tea.WithMouseCellMotion(),
+		tea.WithAltScreen(),
 		tea.WithContext(ctx),
 	)
 	server.Send = func(msg any) {

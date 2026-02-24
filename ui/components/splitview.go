@@ -9,9 +9,8 @@ import (
 )
 
 const (
-	minSplit        = 6
-	splitStep       = 2
-	splitBorderSize = 1
+	minSplit  = 6
+	splitStep = 2
 )
 
 type SplitableModel[V any] interface {
@@ -114,38 +113,11 @@ func (m Splitview[T, B]) Update(msg tea.Msg) (Splitview[T, B], tea.Cmd) {
 			fallthrough
 		case key.Matches(msg, m.keyMap.Enter) && m.top.IsFocused():
 			fallthrough
-		case key.Matches(msg, m.keyMap.Esc) && m.bot.IsFocused():
+		case key.Matches(msg, m.keyMap.Esc) && m.bot.IsFocused() && !capturing:
 			m.top.SetFocus(!m.top.IsFocused())
 			m.bot.SetFocus(!m.bot.IsFocused())
 		default:
 			if m.top.IsFocused() {
-				cmd = m.top.Update(msg)
-			} else {
-				cmd = m.bot.Update(msg)
-			}
-		}
-	case tea.MouseMsg:
-		leftClick := msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress
-		top := true
-		inside := false
-		switch {
-		case msg.Y > 0 && msg.Y < m.h[0]-splitBorderSize:
-			inside = true
-			msg.Y -= splitBorderSize
-		case msg.Y > m.h[0] && msg.Y < m.h[0]+m.h[1]-splitBorderSize:
-			inside = true
-			msg.Y -= m.h[0] + splitBorderSize
-			fallthrough
-		case msg.Y == m.h[0] || msg.Y == m.h[0]+m.h[1]-splitBorderSize:
-			top = false
-		}
-
-		if leftClick {
-			m.top.SetFocus(top)
-			m.bot.SetFocus(!top)
-		}
-		if inside {
-			if top {
 				cmd = m.top.Update(msg)
 			} else {
 				cmd = m.bot.Update(msg)

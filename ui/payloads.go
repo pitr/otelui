@@ -26,7 +26,7 @@ type payloadsModel struct {
 func newPayloadsModel(title string) tea.Model {
 	m := payloadsModel{}
 	m.view = components.NewSplitview(
-		components.NewViewport(title).WithSelectFunc(m.updateDetailsContent).WithSearch(),
+		components.NewViewport(title).WithSelectFunc(m.updateDetailsContent),
 		components.NewViewport("Details"),
 	)
 	return m
@@ -103,7 +103,7 @@ func (m *payloadsModel) updateMainContent() {
 			}
 		}
 		s := fmt.Sprintf("%s %3d %s", nanoToString(uint64(p.Received.UnixNano())), p.Num, t)
-		payloads = append(payloads, components.ViewRow{Str: s, Yank: s, Search: search.String(), Raw: p})
+		payloads = append(payloads, components.ViewRow{Str: s, Search: search.String(), Raw: p})
 	}
 	m.view.Top().SetContent(payloads)
 }
@@ -149,7 +149,7 @@ func (m *payloadsModel) updateDetailsContent(selected components.ViewRow) {
 				Child(t2))
 		}
 		for l := range strings.SplitSeq(t.String(), "\n") {
-			lines = append(lines, components.ViewRow{Str: l, Yank: treeTrim(l)})
+			lines = append(lines, components.ViewRow{Str: l})
 		}
 	case []*traces.ResourceSpans:
 		t := tree.Root(fmt.Sprintf("ResourceSpans (%d)", len(p)))
@@ -210,7 +210,7 @@ func (m *payloadsModel) updateDetailsContent(selected components.ViewRow) {
 				Child(t2))
 		}
 		for l := range strings.SplitSeq(t.String(), "\n") {
-			lines = append(lines, components.ViewRow{Str: l, Yank: treeTrim(l)})
+			lines = append(lines, components.ViewRow{Str: l})
 		}
 	case []*metrics.ResourceMetrics:
 		t := tree.Root(fmt.Sprintf("ResourceMetrics (%d)", len(p)))
@@ -320,7 +320,7 @@ func (m *payloadsModel) updateDetailsContent(selected components.ViewRow) {
 				Child(t2))
 		}
 		for l := range strings.SplitSeq(t.String(), "\n") {
-			lines = append(lines, components.ViewRow{Str: l, Yank: treeTrim(l)})
+			lines = append(lines, components.ViewRow{Str: l})
 		}
 	}
 	m.view.Bot().SetContent(lines)

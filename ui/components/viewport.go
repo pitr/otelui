@@ -3,7 +3,6 @@ package components
 import (
 	"strings"
 
-	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -16,15 +15,15 @@ type InputCapture interface{ IsCapturingInput() bool }
 
 type ViewRow struct {
 	Str    string
-	Yank   string
 	Raw    any
 	Search string
 }
 
 type keysViewport struct {
-	Yank   key.Binding
 	Pgdown key.Binding
 	Pgup   key.Binding
+	Home   key.Binding
+	End    key.Binding
 	Down   key.Binding
 	Up     key.Binding
 	Left   key.Binding
@@ -53,20 +52,23 @@ type Viewport struct {
 	allLines         []ViewRow
 	longestLineWidth int
 
-	searchable   bool
 	searching    bool
 	searchInput  textinput.Model
 	searchFilter string
 }
 
 func NewViewport(title string) *Viewport {
+	ti := textinput.New()
+	ti.Prompt = "/"
+	ti.CharLimit = 128
 	return &Viewport{
 		title:    title,
 		selected: -1,
 		keyMap: keysViewport{
-			Yank:   key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "copy")),
 			Pgup:   key.NewBinding(key.WithKeys("pgup")),
 			Pgdown: key.NewBinding(key.WithKeys("pgdown", " ")),
+			Home:   key.NewBinding(key.WithKeys("home")),
+			End:    key.NewBinding(key.WithKeys("end")),
 			Up:     key.NewBinding(key.WithKeys("up")),
 			Down:   key.NewBinding(key.WithKeys("down")),
 			Left:   key.NewBinding(key.WithKeys("left")),
@@ -74,9 +76,10 @@ func NewViewport(title string) *Viewport {
 			Search: key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
 			Esc:    key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel search")),
 		},
-		_border:   lipgloss.RoundedBorder(),
-		_focused:  AccentColor,
-		_selected: lipgloss.NewStyle().Background(SelectionColor),
+		searchInput: ti,
+		_border:     lipgloss.RoundedBorder(),
+		_focused:    AccentColor,
+		_selected:   lipgloss.NewStyle().Background(SelectionColor),
 	}
 }
 
@@ -87,23 +90,11 @@ func (v *Viewport) WithSelectFunc(f func(ViewRow)) *Viewport {
 	return v
 }
 
-func (v *Viewport) WithSearch() *Viewport {
-	v.searchable = true
-	ti := textinput.New()
-	ti.Prompt = "/"
-	ti.CharLimit = 128
-	v.searchInput = ti
-	return v
-}
-
 func (v Viewport) Help() []key.Binding {
-	if v.searchable && v.searching {
+	if v.searching {
 		return []key.Binding{v.keyMap.Search, v.keyMap.Esc}
 	}
-	if v.searchable {
-		return []key.Binding{v.keyMap.Search, v.keyMap.Yank}
-	}
-	return []key.Binding{v.keyMap.Yank}
+	return []key.Binding{v.keyMap.Search}
 }
 
 func (v *Viewport) SetFocus(b bool)       { v.isFocused = b }
@@ -123,6 +114,10 @@ func (v *Viewport) Update(msg tea.Msg) tea.Cmd {
 			v.scrollTo(v.selected + v.h)
 		case key.Matches(msg, v.keyMap.Pgup):
 			v.scrollTo(v.selected - v.h)
+		case key.Matches(msg, v.keyMap.Home):
+			v.scrollTo(0)
+		case key.Matches(msg, v.keyMap.End):
+			v.scrollTo(len(v.lines) - 1)
 		case key.Matches(msg, v.keyMap.Down):
 			v.scrollTo(v.selected + 1)
 		case key.Matches(msg, v.keyMap.Up):
@@ -131,10 +126,6 @@ func (v *Viewport) Update(msg tea.Msg) tea.Cmd {
 			v.xOffset = max(v.xOffset-1, 0)
 		case key.Matches(msg, v.keyMap.Right) && !v.searching:
 			v.xOffset = max(0, min(v.xOffset+1, v.longestLineWidth-v.w))
-		case key.Matches(msg, v.keyMap.Yank) && !v.searching:
-			if len(v.lines) > 0 {
-				clipboard.WriteAll(v.lines[v.selected].Yank)
-			}
 		case key.Matches(msg, v.keyMap.Esc) && v.searching:
 			wasFiltered := v.searchFilter != ""
 			v.searching = false
@@ -145,7 +136,7 @@ func (v *Viewport) Update(msg tea.Msg) tea.Cmd {
 			if wasFiltered {
 				v.scrollTo(0)
 			}
-		case key.Matches(msg, v.keyMap.Search) && v.searchable && !v.searching:
+		case key.Matches(msg, v.keyMap.Search) && !v.searching:
 			v.searching = true
 			v.searchInput.SetValue("")
 			v.searchFilter = ""
@@ -156,22 +147,6 @@ func (v *Viewport) Update(msg tea.Msg) tea.Cmd {
 			v.lines = v.filterLines(v.allLines)
 			v.longestLineWidth = v.findLongestLineWidth(v.lines)
 			v.scrollTo(0)
-		}
-	case tea.MouseMsg:
-		if msg.Action != tea.MouseActionPress {
-			break
-		}
-		switch msg.Button {
-		case tea.MouseButtonWheelUp:
-			v.yOffset = max(0, v.yOffset-1)
-		case tea.MouseButtonWheelDown:
-			v.yOffset = max(0, min(len(v.lines)-v.h, v.yOffset+1))
-		case tea.MouseButtonWheelLeft:
-			v.xOffset = max(v.xOffset-1, 0)
-		case tea.MouseButtonWheelRight:
-			v.xOffset = max(0, min(v.xOffset+1, v.longestLineWidth-v.w))
-		case tea.MouseButtonLeft:
-			v.scrollTo(msg.Y + v.yOffset)
 		}
 	}
 
@@ -246,7 +221,7 @@ func (v *Viewport) filterLines(all []ViewRow) []ViewRow {
 	}
 	var out []ViewRow
 	for _, l := range all {
-		if strings.Contains(strings.ToLower(l.Yank), v.searchFilter) ||
+		if strings.Contains(strings.ToLower(ansi.Strip(l.Str)), v.searchFilter) ||
 			(l.Search != "" && strings.Contains(strings.ToLower(l.Search), v.searchFilter)) {
 			out = append(out, l)
 		}

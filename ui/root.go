@@ -91,11 +91,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 		cmd = tea.Batch(cmds...)
-	case tea.MouseMsg:
-		if msg.Y >= mRootTopOffset {
-			msg.Y -= mRootTopOffset
-			m.models[m.mode], cmd = m.models[m.mode].Update(msg)
-		}
 	case tea.KeyMsg:
 		capturing := false
 		if ic, ok := m.models[m.mode].(components.InputCapture); ok {

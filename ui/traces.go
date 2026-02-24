@@ -10,7 +10,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/tree"
-	"github.com/charmbracelet/x/ansi"
 	v1 "go.opentelemetry.io/proto/otlp/trace/v1"
 
 	"pitr.ca/otelui/server"
@@ -18,9 +17,8 @@ import (
 )
 
 const (
-	traceMinPane    = 6
-	tracePaneStep   = 2
-	traceBorderSize = 1
+	traceMinPane  = 6
+	tracePaneStep = 2
 )
 
 type keyMapTraces struct {
@@ -53,8 +51,8 @@ func newTracesModel(title string) tea.Model {
 		},
 	}
 	m.views = [3]*components.Viewport{
-		components.NewViewport(title).WithSelectFunc(m.updateSpanTree).WithSearch(),
-		components.NewViewport("Spans").WithSelectFunc(m.updateSpanDetails).WithSearch(),
+		components.NewViewport(title).WithSelectFunc(m.updateSpanTree),
+		components.NewViewport("Spans").WithSelectFunc(m.updateSpanDetails),
 		components.NewViewport("Details"),
 	}
 	m.views[0].SetFocus(true)
@@ -118,31 +116,6 @@ func (m *tracesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		default:
 			m.viewAt(m.focus).Update(msg)
 		}
-	case tea.MouseMsg:
-		h0, h1 := m.h[0], m.h[1]
-		leftClick := msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress
-		var pane int
-		var inside bool
-		switch {
-		case msg.Y < h0:
-			pane = 0
-			inside = msg.Y > 0 && msg.Y < h0-traceBorderSize
-			msg.Y -= traceBorderSize
-		case msg.Y < h0+h1:
-			pane = 1
-			inside = msg.Y > h0 && msg.Y < h0+h1-traceBorderSize
-			msg.Y -= h0 + traceBorderSize
-		default:
-			pane = 2
-			inside = msg.Y > h0+h1 && msg.Y < h0+h1+m.h[2]-traceBorderSize
-			msg.Y -= h0 + h1 + traceBorderSize
-		}
-		if leftClick {
-			m.setFocus(pane)
-		}
-		if inside {
-			m.viewAt(pane).Update(msg)
-		}
 	}
 	return m, nil
 }
@@ -188,7 +161,7 @@ func (m *tracesModel) updateTraceList() {
 		}
 		dur := time.Duration(maxEnd - minStart)
 		str := fmt.Sprintf("%s %s svc=%s name=%s dur=%s (%d spans)", ts, t.TraceID[:6], svc, name, dur, len(t.Spans))
-		rows[i] = components.ViewRow{Str: str, Yank: ansi.Strip(str), Raw: t}
+		rows[i] = components.ViewRow{Str: str, Raw: t}
 	}
 	m.views[0].SetContent(rows)
 }
@@ -247,7 +220,7 @@ func (m *tracesModel) updateSpanTree(selected components.ViewRow) {
 	treeLines := strings.Split(strings.Join(trees, "\n"), "\n")
 	rows := make([]components.ViewRow, len(treeLines))
 	for i, line := range treeLines {
-		rows[i] = components.ViewRow{Str: line, Yank: ansi.Strip(treeTrim(line)), Raw: spanOrder[i]}
+		rows[i] = components.ViewRow{Str: line, Raw: spanOrder[i]}
 	}
 	m.views[1].SetContent(rows)
 }
@@ -304,7 +277,7 @@ func (m *tracesModel) updateSpanDetails(selected components.ViewRow) {
 
 	lines := []components.ViewRow{}
 	for l := range strings.SplitSeq(t.String(), "\n") {
-		lines = append(lines, components.ViewRow{Str: l, Yank: treeTrim(l)})
+		lines = append(lines, components.ViewRow{Str: l})
 	}
 	m.views[2].SetContent(lines)
 }

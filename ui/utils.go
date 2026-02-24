@@ -50,11 +50,6 @@ func nanoToString(nsec uint64) string {
 	return t.Format("2006-01-02T15:04:05.000000000Z07:00")
 }
 
-// treeTrim removes leading tree structure produced by lipgloss/tree, used for yanking
-func treeTrim(s string) string {
-	return strings.TrimLeft(s, " └├─│")
-}
-
 func attrsSearch(groups ...[]*v1.KeyValue) string {
 	var b strings.Builder
 	for _, kvs := range groups {

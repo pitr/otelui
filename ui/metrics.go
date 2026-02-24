@@ -18,7 +18,7 @@ type metricsModel struct {
 func newMetricsModel(title string) tea.Model {
 	m := metricsModel{lastMetrics: -1}
 	m.view = components.NewSplitview(
-		components.NewViewport(title).WithSelectFunc(m.updateDetailsContent).WithSearch(),
+		components.NewViewport(title).WithSelectFunc(m.updateDetailsContent),
 		components.NewTimeseries("Details"),
 	)
 	return m
@@ -55,7 +55,7 @@ func (m *metricsModel) updateMainContent() {
 	ms := server.GetMetrics()
 	sort.Strings(ms)
 	for _, m := range ms {
-		lines = append(lines, components.ViewRow{Str: m, Yank: m, Raw: m})
+		lines = append(lines, components.ViewRow{Str: m, Raw: m})
 	}
 	m.view.Top().SetContent(lines)
 }
