@@ -174,12 +174,21 @@ func (m *tracesModel) updateSpanTree(selected components.ViewRow) {
 		return
 	}
 
-	spanByID := map[string]*server.Span{}
+	var (
+		traceStart, traceEnd uint64
+		spanByID             = map[string]*server.Span{}
+		children             = map[string][]*server.Span{}
+		roots                []*server.Span
+	)
 	for _, s := range trace.Spans {
+		if traceStart == 0 || s.Span.StartTimeUnixNano < traceStart {
+			traceStart = s.Span.StartTimeUnixNano
+		}
+		if s.Span.EndTimeUnixNano > traceEnd {
+			traceEnd = s.Span.EndTimeUnixNano
+		}
 		spanByID[hex.EncodeToString(s.Span.SpanId)] = s
 	}
-	children := map[string][]*server.Span{}
-	var roots []*server.Span
 	for _, s := range trace.Spans {
 		pid := hex.EncodeToString(s.Span.ParentSpanId)
 		if len(s.Span.ParentSpanId) == 0 || spanByID[pid] == nil {
@@ -218,9 +227,17 @@ func (m *tracesModel) updateSpanTree(selected components.ViewRow) {
 	}
 
 	treeLines := strings.Split(strings.Join(trees, "\n"), "\n")
+	maxW := 0
+	for _, l := range treeLines {
+		maxW = max(maxW, lipgloss.Width(l))
+	}
+	barW := max(20, m.w-maxW-3) // border + space
 	rows := make([]components.ViewRow, len(treeLines))
 	for i, line := range treeLines {
-		rows[i] = components.ViewRow{Str: line, Raw: spanOrder[i]}
+		s := spanOrder[i].Span
+		pad := strings.Repeat(" ", maxW-lipgloss.Width(line)+1) // space
+		str := line + pad + ganttBar(s.StartTimeUnixNano, s.EndTimeUnixNano, traceStart, traceEnd, barW)
+		rows[i] = components.ViewRow{Str: str, Raw: spanOrder[i]}
 	}
 	m.views[1].SetContent(rows)
 }
@@ -280,4 +297,16 @@ func (m *tracesModel) updateSpanDetails(selected components.ViewRow) {
 		lines = append(lines, components.ViewRow{Str: l})
 	}
 	m.views[2].SetContent(lines)
+}
+
+func ganttBar(startNano, endNano, traceStart, traceEnd uint64, w int) string {
+	if w <= 0 || traceStart == traceEnd {
+		return strings.Repeat(" ", max(0, w))
+	}
+	left := int(float64(startNano-traceStart) / float64(traceEnd-traceStart) * float64(w))
+	fill := max(1, int(float64(endNano-startNano)/float64(traceEnd-traceStart)*float64(w)))
+	if left+fill > w {
+		fill = w - left
+	}
+	return strings.Repeat(" ", left) + strings.Repeat("▒", fill) + strings.Repeat(" ", w-left-fill)
 }

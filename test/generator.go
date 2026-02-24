@@ -19,7 +19,9 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 )
 
 func main() {
@@ -45,12 +47,22 @@ func main() {
 			ctx, span := tracer.Start(context.Background(), "i-am-root")
 			span.SetStatus(codes.Ok, "i-am-ok")
 			span.SetAttributes(attribute.String("i-am-attr", "i-am-val"))
-			time.Sleep(3 * time.Nanosecond)
+			time.Sleep(2 * time.Nanosecond)
 			span.AddEvent("i-am-event")
-			time.Sleep(3 * time.Nanosecond)
-			_, child := tracer.Start(ctx, "i-am-child")
-			time.Sleep(3 * time.Nanosecond)
-			child.End()
+			time.Sleep(2 * time.Nanosecond)
+			_, child1 := tracer.Start(ctx, "i-am-child")
+			ctx, child2 := tracer.Start(ctx, "i-am-child")
+			_, sub1 := tracer.Start(ctx, "i-am-seq")
+			time.Sleep(1 * time.Nanosecond)
+			sub1.End()
+			_, sub2 := tracer.Start(ctx, "i-am-seq")
+			time.Sleep(1 * time.Nanosecond)
+			sub2.End()
+			_, sub3 := tracer.Start(ctx, "i-am-seq")
+			time.Sleep(1 * time.Nanosecond)
+			sub3.End()
+			child2.End()
+			child1.End()
 			span.End()
 		case <-ticker2.C:
 			ctx, span := tracer.Start(context.Background(), "i-am-root")
@@ -79,22 +91,31 @@ func setupOTelSDK() (func(context.Context) error, error) {
 		return err
 	}
 
+	ctx := context.Background()
+	res, _ := resource.Merge(
+		resource.Default(),
+		resource.NewSchemaless(semconv.ServiceName("generator-app")),
+	)
+
 	// traces
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
 		propagation.Baggage{},
 	))
 
-	traceExporter, err := otlptracehttp.New(context.Background())
+	traceExporter, err := otlptracehttp.New(ctx, otlptracehttp.WithInsecure())
 	if err != nil {
 		return shutdown, err
 	}
-	tracerProvider := trace.NewTracerProvider(trace.WithBatcher(traceExporter))
+	tracerProvider := trace.NewTracerProvider(
+		trace.WithBatcher(traceExporter),
+		trace.WithResource(res),
+	)
 	shutdownFuncs = append(shutdownFuncs, tracerProvider.Shutdown)
 	otel.SetTracerProvider(tracerProvider)
 
 	// metrics
-	metricExporter, err := otlpmetrichttp.New(context.Background())
+	metricExporter, err := otlpmetrichttp.New(ctx, otlpmetrichttp.WithInsecure())
 	if err != nil {
 		return shutdown, err
 	}
@@ -104,6 +125,7 @@ func setupOTelSDK() (func(context.Context) error, error) {
 			metric.WithProducer(runtime.NewProducer()),
 			metric.WithInterval(5*time.Second),
 		)),
+		metric.WithResource(res),
 	)
 	shutdownFuncs = append(shutdownFuncs, meterProvider.Shutdown)
 	otel.SetMeterProvider(meterProvider)
@@ -113,11 +135,14 @@ func setupOTelSDK() (func(context.Context) error, error) {
 	}
 
 	// logs
-	logExporter, err := otlploghttp.New(context.Background())
+	logExporter, err := otlploghttp.New(ctx, otlploghttp.WithInsecure())
 	if err != nil {
 		return shutdown, err
 	}
-	loggerProvider := log.NewLoggerProvider(log.WithProcessor(log.NewBatchProcessor(logExporter)))
+	loggerProvider := log.NewLoggerProvider(
+		log.WithProcessor(log.NewBatchProcessor(logExporter)),
+		log.WithResource(res),
+	)
 	shutdownFuncs = append(shutdownFuncs, loggerProvider.Shutdown)
 	global.SetLoggerProvider(loggerProvider)
 	slog.SetDefault(otelslog.NewLogger("generator"))
