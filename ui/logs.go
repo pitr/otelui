@@ -17,13 +17,23 @@ import (
 	"pitr.ca/otelui/utils"
 )
 
+type keyMapLogs struct {
+	GoToTraces key.Binding
+}
+
 type logsModel struct {
 	view     components.Splitview[*components.Viewport, *components.Viewport]
 	lastLogs int
+	keyMap   keyMapLogs
+	selected *server.Log
 }
 
 func newLogsModel(title string) tea.Model {
-	m := logsModel{}
+	m := &logsModel{
+		keyMap: keyMapLogs{
+			GoToTraces: key.NewBinding(key.WithKeys("T"), key.WithHelp("T", "jump to trace")),
+		},
+	}
 	m.view = components.NewSplitview(
 		components.NewViewport(title).WithSelectFunc(m.updateDetailsContent),
 		components.NewViewport("Details"),
@@ -31,12 +41,25 @@ func newLogsModel(title string) tea.Model {
 	return m
 }
 
-func (m logsModel) Init() tea.Cmd          { return nil }
-func (m logsModel) Help() []key.Binding    { return m.view.Help() }
-func (m logsModel) View() string           { return m.view.View() }
-func (m logsModel) IsCapturingInput() bool { return m.view.Top().IsCapturingInput() }
+func (m logsModel) Init() tea.Cmd { return nil }
+func (m logsModel) View() string  { return m.view.View() }
 
-func (m logsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m logsModel) IsCapturingInput() bool {
+	if m.view.Top().IsFocused() {
+		return m.view.Top().IsCapturingInput()
+	}
+	return m.view.Bot().IsCapturingInput()
+}
+
+func (m logsModel) Help() []key.Binding {
+	bindings := m.view.Help()
+	if !m.IsCapturingInput() && m.selected != nil && len(m.selected.Log.TraceId) > 0 {
+		bindings = append(bindings, m.keyMap.GoToTraces)
+	}
+	return bindings
+}
+
+func (m *logsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
@@ -50,6 +73,17 @@ func (m logsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.lastLogs = msg.Logs
 			m.updateMainContent()
 		}
+	case navigateMsg:
+		cmd = m.view.Top().SetSearch(msg.filter)
+	case tea.KeyMsg:
+		if key.Matches(msg, m.keyMap.GoToTraces) && !m.IsCapturingInput() {
+			if m.selected != nil && len(m.selected.Log.TraceId) > 0 {
+				filter := hex.EncodeToString(m.selected.Log.TraceId)[:6]
+				return m, func() tea.Msg { return navigateMsg{mRootTraces, filter} }
+			}
+		}
+		m.view, cmd = m.view.Update(msg)
+		return m, cmd
 	default:
 		m.view, cmd = m.view.Update(msg)
 		return m, cmd
@@ -74,16 +108,23 @@ func (m *logsModel) updateMainContent() {
 			col = components.DebugColor
 		}
 
+		tid := "      "
+		if len(l.Log.TraceId) > 0 {
+			tid = hex.EncodeToString(l.Log.TraceId)[:6]
+		}
+
 		buf.WriteString(nanoToString(l.Log.TimeUnixNano))
+		buf.WriteByte(' ')
+		buf.WriteString(tid)
 		buf.WriteByte(' ')
 		buf.WriteString(resourceToServiceName(l.ResourceLogs.Resource))
 		buf.WriteByte(' ')
 		buf.WriteString(renderForeground(col, lipgloss.PlaceHorizontal(3, lipgloss.Left, l.Log.SeverityText)))
 		buf.WriteByte(' ')
 		buf.WriteString(utils.AnyToString(l.Log.Body))
-		str := buf.String()
 		search := attrsSearch(l.Log.Attributes, l.ScopeLogs.Scope.Attributes, l.ResourceLogs.Resource.Attributes)
-		lines = append(lines, components.ViewRow{Str: str, Raw: l, Search: search})
+
+		lines = append(lines, components.ViewRow{Str: buf.String(), Raw: l, Search: search})
 		buf.Reset()
 	}
 	m.view.Top().SetContent(lines)
@@ -91,6 +132,7 @@ func (m *logsModel) updateMainContent() {
 
 func (m *logsModel) updateDetailsContent(selected components.ViewRow) {
 	selectedLog, _ := selected.Raw.(*server.Log)
+	m.selected = selectedLog
 	if selectedLog == nil {
 		m.view.Bot().SetContent([]components.ViewRow{})
 		return

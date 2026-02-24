@@ -17,6 +17,11 @@ import (
 
 type mRoot uint
 
+type navigateMsg struct {
+	mode   mRoot
+	filter string
+}
+
 const (
 	mRootLogs mRoot = iota
 	mRootTraces
@@ -91,6 +96,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 		cmd = tea.Batch(cmds...)
+	case navigateMsg:
+		m.mode = msg.mode
+		m.models[m.mode], cmd = m.models[m.mode].Update(msg)
+		return m, cmd
 	case tea.KeyMsg:
 		capturing := false
 		if ic, ok := m.models[m.mode].(components.InputCapture); ok {
@@ -131,9 +140,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	defer func(start time.Time) { slog.Debug(fmt.Sprintf("View() %s", time.Since(start))) }(time.Now())
 
-	keys := []key.Binding{m.keyMap.Next, m.keyMap.Reset, m.keyMap.TZ}
+	capturing := false
+	if ic, ok := m.models[m.mode].(components.InputCapture); ok {
+		capturing = ic.IsCapturingInput()
+	}
+	var keys []key.Binding
 	if h, ok := m.models[m.mode].(components.Helpful); ok {
-		keys = append(keys, h.Help()...)
+		if capturing {
+			keys = h.Help()
+		} else {
+			keys = append([]key.Binding{m.keyMap.Next, m.keyMap.Reset, m.keyMap.TZ}, h.Help()...)
+		}
+	} else {
+		keys = []key.Binding{m.keyMap.Next, m.keyMap.Reset, m.keyMap.TZ}
 	}
 	m.help.Width = m.w
 	return m.models[m.mode].View() + "\n " + m.help.ShortHelpView(keys)

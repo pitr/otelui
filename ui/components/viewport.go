@@ -92,7 +92,7 @@ func (v *Viewport) WithSelectFunc(f func(ViewRow)) *Viewport {
 
 func (v Viewport) Help() []key.Binding {
 	if v.searching {
-		return []key.Binding{v.keyMap.Search, v.keyMap.Esc}
+		return []key.Binding{v.keyMap.Esc}
 	}
 	return []key.Binding{v.keyMap.Search}
 }
@@ -110,7 +110,7 @@ func (v *Viewport) Update(msg tea.Msg) tea.Cmd {
 		v.h = msg.Height - 2
 	case tea.KeyMsg:
 		switch {
-		case key.Matches(msg, v.keyMap.Pgdown):
+		case key.Matches(msg, v.keyMap.Pgdown) && (msg.String() != " " || !v.searching):
 			v.scrollTo(v.selected + v.h)
 		case key.Matches(msg, v.keyMap.Pgup):
 			v.scrollTo(v.selected - v.h)
@@ -202,6 +202,16 @@ func (v *Viewport) SetContent(lines []ViewRow) {
 			v.onSelect(ViewRow{})
 		}
 	}
+}
+
+func (v *Viewport) SetSearch(filter string) tea.Cmd {
+	v.searching = true
+	v.searchInput.SetValue(filter)
+	v.searchFilter = filter
+	v.lines = v.filterLines(v.allLines)
+	v.longestLineWidth = v.findLongestLineWidth(v.lines)
+	v.scrollTo(0)
+	return v.searchInput.Focus()
 }
 
 func (v *Viewport) AddContent(lines []ViewRow) {

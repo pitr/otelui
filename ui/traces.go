@@ -28,6 +28,7 @@ type keyMapTraces struct {
 	Prev     key.Binding
 	Enter    key.Binding
 	Esc      key.Binding
+	GoToLogs key.Binding
 }
 
 type tracesModel struct {
@@ -37,6 +38,7 @@ type tracesModel struct {
 	h         [3]int
 	lastSpans int
 	keyMap    keyMapTraces
+	selected  *server.Trace
 }
 
 func newTracesModel(title string) tea.Model {
@@ -48,6 +50,7 @@ func newTracesModel(title string) tea.Model {
 			Prev:     key.NewBinding(key.WithKeys("shift+tab")),
 			Enter:    key.NewBinding(key.WithKeys("enter")),
 			Esc:      key.NewBinding(key.WithKeys("esc")),
+			GoToLogs: key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "jump to logs")),
 		},
 	}
 	m.views = [3]*components.Viewport{
@@ -63,8 +66,17 @@ func (m *tracesModel) Init() tea.Cmd          { return nil }
 func (m *tracesModel) IsCapturingInput() bool { return m.views[m.focus].IsCapturingInput() }
 
 func (m *tracesModel) Help() []key.Binding {
-	return append([]key.Binding{m.keyMap.Next, m.keyMap.Increase}, m.views[m.focus].Help()...)
+	if m.IsCapturingInput() {
+		return append([]key.Binding{m.keyMap.Next}, m.views[m.focus].Help()...)
+	}
+	bindings := []key.Binding{m.keyMap.Next, m.keyMap.Increase}
+	bindings = append(bindings, m.views[m.focus].Help()...)
+	if m.selected != nil {
+		bindings = append(bindings, m.keyMap.GoToLogs)
+	}
+	return bindings
 }
+
 func (m *tracesModel) View() string {
 	return lipgloss.JoinVertical(lipgloss.Left, m.views[0].View(), m.views[1].View(), m.views[2].View())
 }
@@ -81,6 +93,8 @@ func (m *tracesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.lastSpans = msg.Spans
 			m.updateTraceList()
 		}
+	case navigateMsg:
+		return m, m.views[0].SetSearch(msg.filter)
 	case tea.WindowSizeMsg:
 		m.w = msg.Width
 		total := msg.Height
@@ -91,9 +105,9 @@ func (m *tracesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		capturing := m.views[m.focus].IsCapturingInput()
 		switch {
-		case key.Matches(msg, m.keyMap.Next) && !capturing:
+		case key.Matches(msg, m.keyMap.Next):
 			m.setFocus((m.focus + 1) % 3)
-		case key.Matches(msg, m.keyMap.Prev) && !capturing:
+		case key.Matches(msg, m.keyMap.Prev):
 			m.setFocus((m.focus + 2) % 3)
 		case key.Matches(msg, m.keyMap.Enter) && m.focus < 2:
 			m.setFocus(m.focus + 1)
@@ -112,6 +126,11 @@ func (m *tracesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.h[m.focus] -= tracePaneStep
 				m.h[other] += tracePaneStep
 				m.resizeViewports()
+			}
+		case key.Matches(msg, m.keyMap.GoToLogs) && !capturing:
+			if m.selected != nil {
+				filter := m.selected.TraceID[:6]
+				return m, func() tea.Msg { return navigateMsg{mRootLogs, filter} }
 			}
 		default:
 			m.viewAt(m.focus).Update(msg)
@@ -168,6 +187,7 @@ func (m *tracesModel) updateTraceList() {
 
 func (m *tracesModel) updateSpanTree(selected components.ViewRow) {
 	trace, _ := selected.Raw.(*server.Trace)
+	m.selected = trace
 	if trace == nil {
 		m.views[1].SetContent([]components.ViewRow{})
 		m.views[2].SetContent([]components.ViewRow{})

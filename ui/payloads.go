@@ -32,10 +32,16 @@ func newPayloadsModel(title string) tea.Model {
 	return m
 }
 
-func (m payloadsModel) Init() tea.Cmd          { return nil }
-func (m payloadsModel) Help() []key.Binding    { return m.view.Help() }
-func (m payloadsModel) View() string           { return m.view.View() }
-func (m payloadsModel) IsCapturingInput() bool { return m.view.Top().IsCapturingInput() }
+func (m payloadsModel) Init() tea.Cmd       { return nil }
+func (m payloadsModel) Help() []key.Binding { return m.view.Help() }
+func (m payloadsModel) View() string        { return m.view.View() }
+
+func (m payloadsModel) IsCapturingInput() bool {
+	if m.view.Top().IsFocused() {
+		return m.view.Top().IsCapturingInput()
+	}
+	return m.view.Bot().IsCapturingInput()
+}
 
 func (m payloadsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
