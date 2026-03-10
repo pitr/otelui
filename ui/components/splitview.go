@@ -145,21 +145,27 @@ func (m Splitview[T, B]) View() string {
 func (m *Splitview[T, B]) Top() T { return m.top }
 func (m *Splitview[T, B]) Bot() B { return m.bot }
 
-func (m Splitview[T, B]) Help() []key.Binding {
-	keys := []key.Binding{m.keyMap.Next, m.keyMap.Increase}
-	ckeys := []key.Binding{m.keyMap.Next}
-	if m.top.IsFocused() {
-		if c, ok := any(m.top).(InputCapture); ok && m.top.IsFocused() && c.IsCapturingInput() {
-			keys = append(ckeys, m.top.Help()...)
-		} else {
-			keys = append(keys, m.top.Help()...)
-		}
-	} else {
-		if c, ok := any(m.bot).(InputCapture); ok && m.bot.IsFocused() && c.IsCapturingInput() {
-			keys = append(ckeys, m.bot.Help()...)
-		} else {
-			keys = append(keys, m.bot.Help()...)
-		}
+func (m Splitview[T, B]) IsCapturingInput() bool {
+	if ic, ok := any(m.top).(InputCapture); ok && m.top.IsFocused() {
+		return ic.IsCapturingInput()
 	}
-	return keys
+	if ic, ok := any(m.bot).(InputCapture); ok && m.bot.IsFocused() {
+		return ic.IsCapturingInput()
+	}
+	return false
+}
+
+func (m Splitview[T, B]) Help() []key.Binding {
+	base := []key.Binding{m.keyMap.Next, m.keyMap.Increase}
+	cbase := []key.Binding{m.keyMap.Next}
+	var pane []key.Binding
+	if m.top.IsFocused() {
+		pane = m.top.Help()
+	} else {
+		pane = m.bot.Help()
+	}
+	if m.IsCapturingInput() {
+		return append(cbase, pane...)
+	}
+	return append(base, pane...)
 }

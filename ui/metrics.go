@@ -27,7 +27,7 @@ func newMetricsModel(title string) tea.Model {
 func (m metricsModel) Init() tea.Cmd          { return nil }
 func (m metricsModel) View() string           { return m.view.View() }
 func (m metricsModel) Help() []key.Binding    { return m.view.Help() }
-func (m metricsModel) IsCapturingInput() bool { return m.view.Top().IsCapturingInput() }
+func (m metricsModel) IsCapturingInput() bool { return m.view.IsCapturingInput() }
 
 func (m metricsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd

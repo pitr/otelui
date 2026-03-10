@@ -44,12 +44,7 @@ func newLogsModel(title string) tea.Model {
 func (m logsModel) Init() tea.Cmd { return nil }
 func (m logsModel) View() string  { return m.view.View() }
 
-func (m logsModel) IsCapturingInput() bool {
-	if m.view.Top().IsFocused() {
-		return m.view.Top().IsCapturingInput()
-	}
-	return m.view.Bot().IsCapturingInput()
-}
+func (m logsModel) IsCapturingInput() bool { return m.view.IsCapturingInput() }
 
 func (m logsModel) Help() []key.Binding {
 	bindings := m.view.Help()
